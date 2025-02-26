@@ -1,0 +1,51 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+
+*.egg-info/
+.installed.cfg
+*.egg
+*.manifest
+*.spec
+.coverage
+htmlcov/
+.tox/
+.coverage.*
+.cache/
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+backend/venv/
+backend/staticfiles/
+
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+docs/
+
+# Django migration files
+# backend/*/migrations/*.py
+# !backend/*/migrations/__init__.py
+
+# Next.js / Frontend

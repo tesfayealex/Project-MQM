@@ -1,0 +1,118 @@
+{
+  "SurveySchema": {
+    "ProjectInformation": {
+      "BuildingName": {
+        "type": "string",
+        "required": false
+      },
+      "ShortID": {
+        "type": "string",
+        "required": true
+      },
+      "ProjectDescription": {
+        "type": "string",
+        "required": true
+      }
+    },
+    "ProjectAddress": {
+      "StreetNumber": {
+        "type": "string",
+        "required": false
+      },
+      "CityCode": {
+        "type": "string",
+        "required": false
+      },
+      "City": {
+        "type": "string",
+        "required": false
+      },
+      "Country": {
+        "type": "string",
+        "required": false
+      }
+    },
+    "ProjectToken": {
+      "Token": {
+        "type": "string",
+        "constraints": "Only lowercase letters, no special characters, no spaces"
+      }
+    },
+    "ProjectDetails": {
+      "SurveyLanguage": {
+        "type": "enum", // the enum should can be a list of languages
+        "options": ["de", "en", "pt", "es"],
+        "required": true
+      },
+      "MaxParticipants": {
+        "type": "number",
+        "required": true
+      },
+      "EndDate": {
+        "type": "datetime",
+        "components": ["day", "month", "year", "hour", "minute"]
+      },
+      "AnalysisEndDate": {
+        "type": "datetime",
+        "components": ["day", "month", "year", "hour", "minute"]
+      },
+      "AnalysisCluster": {
+        "type": "enum", // the enum should can a string
+        "options": [
+          "Standard",
+          "CoreNet Event",
+          "Event & Conference",
+          "HomeOffice"
+        ],
+        "default": "Standard",
+        "required": false
+      },
+      "EndSurveyTitles": [
+          {
+            "type": "string",
+            "required": true
+          },
+          {
+            "type": "string",
+            "required": true
+          }
+        ],
+        "ExpiredSurvey": {
+          "Title": {
+            "type": "string",
+            "required": true
+          },
+          "Text": {
+            "type": "string",
+            "required": true
+          }
+    },
+},
+},
+
+"Question_Schema": {
+        "Headline": {
+          "type": "string",
+          "required": true
+        },
+        "SurveyText": {
+          "type": "string",
+          "required": true
+        },
+        "QuestionType":{
+            "type": "enum",
+            "options": ["nps","free_text"],
+            "required": true
+        },
+        "Question": {
+            "type": "string",
+            "required": true
+        },
+
+        "Question_Placeholder": {
+            "type": "string"
+
+          }
+        
+    }
+  }
