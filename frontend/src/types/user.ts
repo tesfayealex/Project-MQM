@@ -1,12 +1,12 @@
 export interface User {
-  id: string;
+  id: number;
   username: string;
   email: string;
   first_name?: string;
   last_name?: string;
   is_staff: boolean;
-  is_active: boolean;
   date_joined: string;
+  is_active: boolean;
   groups: Group[];
 }
 
@@ -16,11 +16,10 @@ export interface Group {
 }
 
 export interface UserFormValues {
-  username: string;
   email: string;
   password?: string;
   first_name?: string;
   last_name?: string;
-  is_active: boolean;
+  is_active?: boolean;
   group_ids?: number[];
 } 

@@ -144,21 +144,23 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
-        <div className="rounded-lg border bg-card p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">Total Users</div>
-              <div className="mt-2 text-2xl font-bold">{loading ? "-" : stats?.total_users || 0}</div>
+        {session?.user?.groups?.some(group => group.name === 'Admin') && (
+          <div className="rounded-lg border bg-card p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-muted-foreground">Total Users</div>
+                <div className="mt-2 text-2xl font-bold">{loading ? "-" : stats?.total_users || 0}</div>
+              </div>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </div>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            {!loading && stats?.user_growth_rate && (
+              <div className="mt-4 flex items-center text-sm text-green-500">
+                <TrendingUp className="mr-1 h-4 w-4" />
+                <span>+{stats.user_growth_rate}% from last month</span>
+              </div>
+            )}
           </div>
-          {!loading && stats?.user_growth_rate && (
-            <div className="mt-4 flex items-center text-sm text-green-500">
-              <TrendingUp className="mr-1 h-4 w-4" />
-              <span>+{stats.user_growth_rate}% from last month</span>
-            </div>
-          )}
-        </div>
+        )}
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between">
             <div>

@@ -16,10 +16,41 @@ from .serializers import (
 
 
 class IsCreatorOrReadOnly(permissions.BasePermission):
-    def has_object_permission(self, request, view, obj):
+    def has_permission(self, request, view):
+        # Must be authenticated
+        if not request.user.is_authenticated:
+            return False
+            
+        # Admin and Organizer have full access
+        if request.user.groups.filter(name__in=['Admin', 'Organizer']).exists():
+            return True
+            
+        # Moderator can create surveys and access their own
+        if request.user.groups.filter(name='Moderator').exists():
+            return True
+            
+        # For GET requests, allow if survey is active (for participants)
         if request.method in permissions.SAFE_METHODS:
             return True
-        return obj.created_by == request.user
+            
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        # Admin and Organizer have full access
+        if request.user.groups.filter(name__in=['Admin', 'Organizer']).exists():
+            return True
+            
+        # Moderator can only view and edit (but not delete) their own surveys
+        if request.user.groups.filter(name='Moderator').exists():
+            if request.method == 'DELETE':
+                return False
+            return obj.created_by == request.user
+            
+        # For GET requests, allow if survey is active (for participants)
+        if request.method in permissions.SAFE_METHODS:
+            return obj.is_active
+            
+        return False
 
 
 class SurveyViewSet(viewsets.ModelViewSet):
@@ -34,17 +65,21 @@ class SurveyViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = Survey.objects.all()
         
+        # Admin and Organizer can see all surveys
+        if self.request.user.groups.filter(name__in=['Admin', 'Organizer']).exists():
+            pass
+        # Moderator can only see their own surveys
+        elif self.request.user.groups.filter(name='Moderator').exists():
+            queryset = queryset.filter(created_by=self.request.user)
+        # Others (participants) can only see active surveys
+        else:
+            queryset = queryset.filter(is_active=True)
+        
         # Filter by creator if requested
         created_by = self.request.query_params.get('created_by', None)
         if created_by and created_by == 'me':
             queryset = queryset.filter(created_by=self.request.user)
             
-        # Filter by active status if requested
-        is_active = self.request.query_params.get('is_active', None)
-        if is_active is not None:
-            is_active = is_active.lower() == 'true'
-            queryset = queryset.filter(is_active=is_active)
-        
         # Filter by language if requested
         language = self.request.query_params.get('language', None)
         if language:
@@ -130,6 +165,12 @@ class SurveyViewSet(viewsets.ModelViewSet):
         
         return (completed / total_starts) * 100
 
+    def perform_destroy(self, instance):
+        # Additional check for delete permission
+        if self.request.user.groups.filter(name='Moderator').exists():
+            raise permissions.PermissionDenied("Moderators cannot delete surveys")
+        super().perform_destroy(instance)
+
 
 class QuestionViewSet(viewsets.ModelViewSet):
     queryset = Question.objects.all()
@@ -138,10 +179,23 @@ class QuestionViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Question.objects.all()
+        
+        # Admin and Organizer can see all questions
+        if self.request.user.groups.filter(name__in=['Admin', 'Organizer']).exists():
+            pass
+        # Moderator can only see questions from their surveys
+        elif self.request.user.groups.filter(name='Moderator').exists():
+            queryset = queryset.filter(survey__created_by=self.request.user)
+        # Others can only see questions from active surveys
+        else:
+            queryset = queryset.filter(survey__is_active=True)
+        
+        # Filter by survey if requested
         survey_id = self.request.query_params.get('survey', None)
         if survey_id is not None:
             queryset = queryset.filter(survey_id=survey_id)
             
+        # Filter by language if requested
         language = self.request.query_params.get('language', None)
         if language is not None:
             queryset = queryset.filter(language=language)
@@ -152,9 +206,17 @@ class QuestionViewSet(viewsets.ModelViewSet):
         survey_id = self.request.data.get('survey')
         if survey_id:
             survey = Survey.objects.get(id=survey_id)
-            if survey.created_by != self.request.user:
-                raise permissions.PermissionDenied("You don't have permission to add questions to this survey.")
+            # Check if user has permission to add questions
+            if not self.request.user.groups.filter(name__in=['Admin', 'Organizer']).exists():
+                if survey.created_by != self.request.user:
+                    raise permissions.PermissionDenied("You don't have permission to add questions to this survey.")
         serializer.save()
+
+    def perform_destroy(self, instance):
+        # Moderators cannot delete questions
+        if self.request.user.groups.filter(name='Moderator').exists():
+            raise permissions.PermissionDenied("Moderators cannot delete questions")
+        super().perform_destroy(instance)
 
 
 class ResponseViewSet(viewsets.ModelViewSet):
@@ -287,21 +349,36 @@ class DashboardViewSet(viewsets.ViewSet):
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        # Get counts for the requesting user
-        user_surveys = Survey.objects.filter(created_by=request.user).count()
+        # Get counts based on user role
+        is_admin = request.user.groups.filter(name='Admin').exists()
+        is_organizer = request.user.groups.filter(name='Organizer').exists()
         
-        # Get all the user's surveys
-        surveys = Survey.objects.filter(created_by=request.user)
+        # Get survey counts
+        if is_admin or is_organizer:
+            # Admin and Organizer see all surveys
+            total_surveys = Survey.objects.count()
+            surveys = Survey.objects.all()
+        else:
+            # Others only see their own surveys
+            total_surveys = Survey.objects.filter(created_by=request.user).count()
+            surveys = Survey.objects.filter(created_by=request.user)
+        
+        # Get response counts for accessible surveys
         total_responses = Response.objects.filter(survey__in=surveys).count()
         
-        # Total users (if admin)
-        total_users = 0
-        if request.user.is_staff:
-            total_users = User.objects.count()
+        # Calculate survey completion rate
+        completion_rate = 0
+        if total_surveys > 0:
+            completed_surveys = 0
+            for survey in surveys:
+                if self.calculate_survey_completion(survey) >= 100:
+                    completed_surveys += 1
+            
+            completion_rate = (completed_surveys / total_surveys) * 100
         
-        # Recent activity
+        # Recent activity - show responses for accessible surveys
         recent_responses = Response.objects.filter(
-            survey__created_by=request.user
+            survey__in=surveys
         ).order_by('-created_at')[:5]
         
         recent_activity = []
@@ -312,32 +389,31 @@ class DashboardViewSet(viewsets.ViewSet):
                 'date': response.created_at.strftime("%Y-%m-%d %H:%M")
             })
         
-        # Calculate survey completion rate
-        completion_rate = 0
-        if user_surveys > 0:
-            completed_surveys = 0
-            for survey in surveys:
-                if self.calculate_survey_completion(survey) >= 100:
-                    completed_surveys += 1
-            
-            completion_rate = (completed_surveys / user_surveys) * 100
-        
-        # Calculate user growth rate (for admins)
-        user_growth_rate = 0
-        if request.user.is_staff:
-            month_ago = timezone.now() - timedelta(days=30)
-            users_month_ago = User.objects.filter(date_joined__lt=month_ago).count()
-            if users_month_ago > 0:
-                user_growth_rate = ((User.objects.count() - users_month_ago) / users_month_ago) * 100
-        
-        return DRFResponse({
-            'total_surveys': user_surveys,
+        # Prepare response data
+        response_data = {
+            'total_surveys': total_surveys,
             'total_responses': total_responses,
-            'total_users': total_users,
             'survey_completion_rate': round(completion_rate, 1),
-            'user_growth_rate': round(user_growth_rate, 1),
             'recent_activity': recent_activity
-        })
+        }
+        
+        # Only include user stats for Admin
+        if is_admin:
+            # Calculate user growth rate
+            month_ago = timezone.now() - timedelta(days=30)
+            total_users = User.objects.count()
+            users_month_ago = User.objects.filter(date_joined__lt=month_ago).count()
+            
+            user_growth_rate = 0
+            if users_month_ago > 0:
+                user_growth_rate = ((total_users - users_month_ago) / users_month_ago) * 100
+            
+            response_data.update({
+                'total_users': total_users,
+                'user_growth_rate': round(user_growth_rate, 1)
+            })
+        
+        return DRFResponse(response_data)
     
     def calculate_survey_completion(self, survey):
         """Calculate if a survey is complete based on required fields."""

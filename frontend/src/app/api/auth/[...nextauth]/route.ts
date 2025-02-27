@@ -79,6 +79,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.email = user.email
         token.name = user.name || user.email
+        token.groups = user.groups // Add groups to the token
       }
       return token
     },
@@ -90,6 +91,7 @@ export const authOptions: NextAuthOptions = {
           id: token.id as string,
           email: token.email as string,
           name: token.name as string,
+          groups: token.groups as Array<{ id: number; name: string }>, // Add groups to the session
         }
       }
       return session

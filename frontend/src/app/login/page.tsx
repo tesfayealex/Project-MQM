@@ -55,10 +55,21 @@ export default function LoginPage() {
           // If already authenticated, sign out first and retry
           if (errorData.detail === "Already authenticated") {
             console.log("User is already authenticated, signing out first...")
+            
+            // First logout from Django
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/logout/`, {
+              method: 'POST',
+              credentials: 'include',
+            })
+            
+            // Then logout from NextAuth
             await signOut({ redirect: false })
             
+            // Wait a moment for sessions to clear
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
             // Retry the login after signing out
-            const retryResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login/`, {
+            const retryResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/login/`, {
               method: 'POST',
               headers: { 
                 'Content-Type': 'application/json',

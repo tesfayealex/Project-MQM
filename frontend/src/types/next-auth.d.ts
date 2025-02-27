@@ -7,12 +7,15 @@ declare module "next-auth" {
     firstName?: string
     lastName?: string
     role: string
+    name?: string
+    groups: Array<{
+      id: number
+      name: string
+    }>
   }
 
   interface Session {
-    user: User & {
-      role: string
-    }
+    user: User
   }
 }
 
@@ -23,5 +26,9 @@ declare module "next-auth/jwt" {
     firstName?: string
     lastName?: string
     role?: string
+    groups?: Array<{
+      id: number
+      name: string
+    }>
   }
 } 

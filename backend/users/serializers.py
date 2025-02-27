@@ -8,7 +8,7 @@ class GroupSerializer(serializers.ModelSerializer):
         fields = ('id', 'name')
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
+    password = serializers.CharField(write_only=True, required=False, validators=[validate_password])
     groups = GroupSerializer(many=True, read_only=True)
     group_ids = serializers.ListField(
         child=serializers.IntegerField(),
@@ -30,6 +30,10 @@ class UserSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         group_ids = validated_data.pop('group_ids', [])
         
+        # Password is required for creation
+        if 'password' not in validated_data:
+            raise serializers.ValidationError({'password': 'Password is required when creating a user'})
+        
         user = User.objects.create_user(
             username=validated_data['email'],
             email=validated_data['email'],
@@ -47,21 +51,21 @@ class UserSerializer(serializers.ModelSerializer):
         return user
 
     def update(self, instance, validated_data):
-        group_ids = validated_data.pop('group_ids', None)
-        
-        if 'password' in validated_data:
-            password = validated_data.pop('password')
+        # Handle password update separately
+        password = validated_data.pop('password', None)
+        if password:
             instance.set_password(password)
-            
-        # Update other fields
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-            
-        # Update groups if provided
+        
+        # Handle group updates
+        group_ids = validated_data.pop('group_ids', None)
         if group_ids is not None:
             groups = Group.objects.filter(id__in=group_ids)
             instance.groups.set(groups)
-            
+        
+        # Update other fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        
         instance.save()
         return instance
 

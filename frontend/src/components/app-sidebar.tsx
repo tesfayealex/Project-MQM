@@ -26,7 +26,10 @@ interface User {
   name?: string | null
   email?: string | null
   image?: string | null
-  role?: string
+  groups?: Array<{
+    id: number
+    name: string
+  }>
 }
 
 // Menu items with role-based access
@@ -35,37 +38,38 @@ const items = [
     title: "Dashboard",
     url: "/dashboard",
     icon: Home,
-    roles: ["user", "admin", "moderator"],
+    roles: ["Admin", "Organizer", "Moderator"],
   },
   {
     title: "Surveys",
     url: "/dashboard/surveys",
     icon: ClipboardList,
-    roles: ["user", "admin", "moderator"],
+    roles: ["Admin", "Organizer", "Moderator"],
   },
   {
     title: "Analytics",
     url: "/dashboard/analytics",
     icon: BarChart,
-    roles: ["user", "admin", "moderator"], //["admin", "moderator"],
+    roles: ["Admin", "Organizer", "Moderator"],
   },
   {
     title: "Users",
     url: "/dashboard/users",
     icon: Users,
-    roles: ["user", "admin", "moderator"], //["admin"],
+    roles: ["Admin", "Organizer"],
   },
   {
     title: "Settings",
     url: "/dashboard/settings",
     icon: Settings,
-    roles: ["user", "admin", "moderator"],
+    roles: ["Admin", "Organizer", "Moderator"],
   },
 ]
 
 export function AppSidebar() {
   const { data: session, status } = useSession()
-  const userRole = session?.user?.role || "user"
+  const userGroups = session?.user?.groups || []
+  const userRoles = userGroups.map(group => group.name)
   const pathname = usePathname()
   const { state } = useSidebar()
 
@@ -100,10 +104,32 @@ export function AppSidebar() {
     )
   }
 
-  // Filter items based on user role
+  // Filter menu items based on user roles
   const filteredItems = items.filter(item => 
-    item.roles.includes(userRole)
+    item.roles.some(role => userRoles.includes(role))
   )
+
+  console.log("filteredItems")
+  console.log(filteredItems)
+  console.log(userRoles)
+  console.log(session)
+
+  const handleLogout = async () => {
+    try {
+      // First, call Django logout endpoint
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/auth/logout/`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      // Then call NextAuth signOut
+      await signOut({ callbackUrl: '/login' });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still try to sign out from NextAuth even if Django logout fails
+      await signOut({ callbackUrl: '/login' });
+    }
+  };
 
   return (
     <Sidebar collapsible="icon">
@@ -165,7 +191,7 @@ export function AppSidebar() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <SidebarMenuButton 
-                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    onClick={handleLogout}
                     className={cn(
                       "flex items-center gap-3 text-destructive hover:bg-destructive/10",
                       state === "collapsed" && "justify-center"
