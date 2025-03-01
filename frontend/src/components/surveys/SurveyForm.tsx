@@ -59,6 +59,7 @@ const surveySchema = z.object({
   building_name: z.string().optional(),
   project_name: z.string().optional(),
   project_description: z.string().optional(),
+  token: z.string().optional(),
   // Address fields
   street: z.string().optional(),
   city: z.string().optional(),
@@ -106,12 +107,14 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
           type: q.type || 'nps'
         };
       }) || [],
-      end_survey_title: initialData?.end_survey_title || '',
-      end_survey_text: initialData?.end_survey_text || '',
+      // Get the first language's end survey messages from the respective objects
+      end_survey_title: initialData?.end_survey_titles?.[initialData?.languages?.[0] || 'en'] || '',
+      end_survey_text: initialData?.end_survey_texts?.[initialData?.languages?.[0] || 'en'] || '',
       end_survey_titles: initialData?.end_survey_titles || {},
       end_survey_texts: initialData?.end_survey_texts || {},
-      expired_survey_title: initialData?.expired_survey_title || '',
-      expired_survey_text: initialData?.expired_survey_text || '',
+      // Get the first language's expired survey messages from the respective objects
+      expired_survey_title: initialData?.expired_survey_titles?.[initialData?.languages?.[0] || 'en'] || '',
+      expired_survey_text: initialData?.expired_survey_texts?.[initialData?.languages?.[0] || 'en'] || '',
       expired_survey_titles: initialData?.expired_survey_titles || {},
       expired_survey_texts: initialData?.expired_survey_texts || {},
       expiry_date: initialData?.expiry_date ? 
@@ -122,6 +125,7 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
       building_name: initialData?.building_name || '',
       project_name: initialData?.project_name || '',
       project_description: initialData?.project_description || '',
+      token: initialData?.token || '',
       street: initialData?.street || '',
       city: initialData?.city || '',
       postal_code: initialData?.postal_code || '',
@@ -149,28 +153,28 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
     console.log('Form submission started');
     console.log('Raw form data:', data);
     
-    // Validate questions have text for all languages
-    const hasValidQuestions = data.questions.every((q, qIndex) => {
-      return data.languages.every(lang => {
-        const hasText = q.questions[lang] && q.questions[lang].trim() !== '';
-        if (!hasText) {
-          methods.setError(`questions.${qIndex}.questions.${lang}`, {
-            type: 'custom',
-            message: `Question ${qIndex + 1} is missing text for language: ${lang}`
-          });
-        }
-        return hasText;
-      });
-    });
-
-    if (!hasValidQuestions) {
-      console.log('Question validation failed');
-      return;
-    }
-    
     // Format the data for submission
     const formattedData = {
       ...data,
+      // Format expiry_date to ISO string if it exists
+      expiry_date: data.expiry_date ? new Date(data.expiry_date).toISOString() : null,
+      // Save first language's end survey messages into the respective objects
+      end_survey_titles: {
+        ...data.end_survey_titles,
+        [data.languages[0]]: data.end_survey_title || ''
+      },
+      end_survey_texts: {
+        ...data.end_survey_texts,
+        [data.languages[0]]: data.end_survey_text || ''
+      },
+      expired_survey_titles: {
+        ...data.expired_survey_titles,
+        [data.languages[0]]: data.expired_survey_title || ''
+      },
+      expired_survey_texts: {
+        ...data.expired_survey_texts,
+        [data.languages[0]]: data.expired_survey_text || ''
+      },
       questions: data.questions.map((q, index) => {
         // Clean up empty strings in questions and placeholders
         const questions = Object.fromEntries(
@@ -333,103 +337,101 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
           <TabsContent value="end-messages" className="space-y-4">
             <Card>
               <CardContent className="pt-6 space-y-6">
-                <h3 className="text-lg font-medium">Completion Messages</h3>
+                <h3 className="text-lg font-medium">End Survey Messages</h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="end_survey_title">End Survey Title</Label>
+                  <Label htmlFor="end_survey_title">
+                    End Survey Title ({selectedLanguages[0]?.toUpperCase()})
+                  </Label>
                   <Input 
                     id="end_survey_title" 
-                    placeholder="Thank you for your feedback" 
+                    placeholder={`Thank you for your feedback (${selectedLanguages[0]?.toUpperCase()})`}
                     {...methods.register('end_survey_title')} 
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="end_survey_text">End Survey Message</Label>
+                  <Label htmlFor="end_survey_text">
+                    End Survey Message ({selectedLanguages[0]?.toUpperCase()})
+                  </Label>
                   <Textarea 
                     id="end_survey_text" 
-                    placeholder="Your feedback is valuable to us" 
+                    placeholder={`Your feedback is valuable to us (${selectedLanguages[0]?.toUpperCase()})`}
                     {...methods.register('end_survey_text')} 
                   />
                 </div>
 
-                {/* Multilingual end messages */}
-                {selectedLanguages.length > 0 && selectedLanguages.map(lang => (
+                {selectedLanguages.length > 0 && selectedLanguages.slice(1).map((lang: string) => (
                   <React.Fragment key={`end-${lang}`}>
-                    {lang !== 'en' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor={`end_survey_titles.${lang}`}>
-                            End Title - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
-                          </Label>
-                          <Input 
-                            id={`end_survey_titles.${lang}`}
-                            placeholder={`End title in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
-                            {...methods.register(`end_survey_titles.${lang}`)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`end_survey_texts.${lang}`}>
-                            End Message - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
-                          </Label>
-                          <Textarea 
-                            id={`end_survey_texts.${lang}`}
-                            placeholder={`End message in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
-                            {...methods.register(`end_survey_texts.${lang}`)}
-                          />
-                        </div>
-                      </>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor={`end_survey_titles.${lang}`}>
+                        End Title - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
+                      </Label>
+                      <Input 
+                        id={`end_survey_titles.${lang}`}
+                        placeholder={`End title in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
+                        {...methods.register(`end_survey_titles.${lang}`)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`end_survey_texts.${lang}`}>
+                        End Message - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
+                      </Label>
+                      <Textarea 
+                        id={`end_survey_texts.${lang}`}
+                        placeholder={`End message in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
+                        {...methods.register(`end_survey_texts.${lang}`)}
+                      />
+                    </div>
                   </React.Fragment>
                 ))}
 
                 <h3 className="text-lg font-medium mt-8">Expired Survey Messages</h3>
 
                 <div className="space-y-2">
-                  <Label htmlFor="expired_survey_title">Expired Survey Title</Label>
+                  <Label htmlFor="expired_survey_title">
+                    Expired Survey Title ({selectedLanguages[0]?.toUpperCase()})
+                  </Label>
                   <Input 
                     id="expired_survey_title" 
-                    placeholder="Survey Expired" 
+                    placeholder={`Survey Expired (${selectedLanguages[0]?.toUpperCase()})`}
                     {...methods.register('expired_survey_title')} 
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="expired_survey_text">Expired Survey Message</Label>
+                  <Label htmlFor="expired_survey_text">
+                    Expired Survey Message ({selectedLanguages[0]?.toUpperCase()})
+                  </Label>
                   <Textarea 
                     id="expired_survey_text" 
-                    placeholder="This survey is no longer available" 
+                    placeholder={`This survey is no longer available (${selectedLanguages[0]?.toUpperCase()})`}
                     {...methods.register('expired_survey_text')} 
                   />
                 </div>
 
-                {/* Multilingual expired messages */}
-                {selectedLanguages.length > 0 && selectedLanguages.map(lang => (
+                {selectedLanguages.length > 0 && selectedLanguages.slice(1).map((lang: string) => (
                   <React.Fragment key={`expired-${lang}`}>
-                    {lang !== 'en' && (
-                      <>
-                        <div className="space-y-2">
-                          <Label htmlFor={`expired_survey_titles.${lang}`}>
-                            Expired Title - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
-                          </Label>
-                          <Input 
-                            id={`expired_survey_titles.${lang}`}
-                            placeholder={`Expired title in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
-                            {...methods.register(`expired_survey_titles.${lang}`)}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`expired_survey_texts.${lang}`}>
-                            Expired Message - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
-                          </Label>
-                          <Textarea 
-                            id={`expired_survey_texts.${lang}`}
-                            placeholder={`Expired message in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
-                            {...methods.register(`expired_survey_texts.${lang}`)}
-                          />
-                        </div>
-                      </>
-                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor={`expired_survey_titles.${lang}`}>
+                        Expired Title - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
+                      </Label>
+                      <Input 
+                        id={`expired_survey_titles.${lang}`}
+                        placeholder={`Expired title in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
+                        {...methods.register(`expired_survey_titles.${lang}`)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={`expired_survey_texts.${lang}`}>
+                        Expired Message - {AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}
+                      </Label>
+                      <Textarea 
+                        id={`expired_survey_texts.${lang}`}
+                        placeholder={`Expired message in ${AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name}`}
+                        {...methods.register(`expired_survey_texts.${lang}`)}
+                      />
+                    </div>
                   </React.Fragment>
                 ))}
               </CardContent>
@@ -440,72 +442,120 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
           <TabsContent value="project-info" className="space-y-4">
             <Card>
               <CardContent className="pt-6 space-y-4">
-                <h3 className="text-lg font-medium">Project Information</h3>
-
                 <div className="space-y-2">
                   <Label htmlFor="building_name">Building Name</Label>
-                  <Input 
-                    id="building_name" 
-                    placeholder="Building Name" 
-                    {...methods.register('building_name')} 
+                  <Input
+                    id="building_name"
+                    {...methods.register('building_name')}
+                    placeholder="Enter building name"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="project_name">Project Name</Label>
-                  <Input 
-                    id="project_name" 
-                    placeholder="Project Name" 
-                    {...methods.register('project_name')} 
+                  <Input
+                    id="project_name"
+                    {...methods.register('project_name')}
+                    placeholder="Enter project name"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="project_description">Project Description</Label>
-                  <Textarea 
-                    id="project_description" 
-                    placeholder="Project Description" 
-                    {...methods.register('project_description')} 
+                  <Textarea
+                    id="project_description"
+                    {...methods.register('project_description')}
+                    placeholder="Enter project description"
                   />
-                </div>
-
-                <h3 className="text-lg font-medium mt-6">Address</h3>
-
-                <div className="space-y-2">
-                  <Label htmlFor="street">Street</Label>
-                  <Input 
-                    id="street" 
-                    placeholder="Street" 
-                    {...methods.register('street')} 
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="city">City</Label>
-                    <Input 
-                      id="city" 
-                      placeholder="City" 
-                      {...methods.register('city')} 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="postal_code">Postal Code</Label>
-                    <Input 
-                      id="postal_code" 
-                      placeholder="Postal Code" 
-                      {...methods.register('postal_code')} 
-                    />
-                  </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input 
-                    id="country" 
-                    placeholder="Country" 
-                    {...methods.register('country')} 
-                  />
+                  <Label htmlFor="token">
+                    Public Access Token
+                    <span className="ml-2 text-sm text-gray-500">
+                      (Required for QR code and public access)
+                    </span>
+                  </Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="token"
+                      {...methods.register('token')}
+                      placeholder="Enter or generate token"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => {
+                        const newToken = Math.random().toString(36).substring(2, 15);
+                        methods.setValue('token', newToken);
+                      }}
+                    >
+                      Generate
+                    </Button>
+                  </div>
+                </div>
+
+                {initialData?.token && (
+                  <div className="mt-4 p-4 border rounded-lg bg-gray-50">
+                    <h3 className="text-sm font-medium mb-2">Public Access Information</h3>
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-600">
+                        Public Survey URL:
+                        <a
+                          href={`/survey/${initialData.token}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-2 text-blue-600 hover:underline break-all"
+                        >
+                          {window.location.origin}/survey/{initialData.token}
+                        </a>
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        QR Code will be available after saving the survey.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t pt-4 mt-4">
+                  <h3 className="text-sm font-medium mb-4">Location Information</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="street">Street</Label>
+                      <Input
+                        id="street"
+                        {...methods.register('street')}
+                        placeholder="Enter street"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        {...methods.register('city')}
+                        placeholder="Enter city"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="postal_code">Postal Code</Label>
+                      <Input
+                        id="postal_code"
+                        {...methods.register('postal_code')}
+                        placeholder="Enter postal code"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country</Label>
+                      <Input
+                        id="country"
+                        {...methods.register('country')}
+                        placeholder="Enter country"
+                      />
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

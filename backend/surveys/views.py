@@ -13,6 +13,9 @@ from .serializers import (
     ResponseSerializer, 
     AnswerSerializer
 )
+from django.http import HttpResponse
+import qrcode
+from io import BytesIO
 
 
 class IsCreatorOrReadOnly(permissions.BasePermission):
@@ -58,7 +61,7 @@ class SurveyViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsCreatorOrReadOnly]
     
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update', 'retrieve']:
+        if self.action in ['create', 'update', 'partial_update', 'retrieve', 'public']:
             return SurveyDetailSerializer
         return SurveySerializer
     
@@ -141,6 +144,101 @@ class SurveyViewSet(viewsets.ModelViewSet):
             'detractors': detractors,
             'passives': total_nps - promoters - detractors
         })
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny], url_path='public')
+    def public(self, request):
+        token = request.query_params.get('token')
+        
+        if not token:
+            return DRFResponse({'detail': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            survey = Survey.objects.get(token=token)
+            serializer = SurveyDetailSerializer(survey)
+            survey_data = serializer.data
+            
+            # Check if survey is active and not expired
+            if not survey.is_active:
+                return DRFResponse({
+                    'detail': 'This survey is no longer active',
+                    'survey': survey_data,
+                    'status': 'inactive'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Check if survey has expired
+            if survey.expiry_date and survey.expiry_date < timezone.now():
+                return DRFResponse({
+                    'detail': 'This survey has expired',
+                    'survey': survey_data,
+                    'status': 'expired'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Check if survey has reached max participants
+            current_responses = Response.objects.filter(survey=survey).count()
+            if survey.max_participants and current_responses >= survey.max_participants:
+                return DRFResponse({
+                    'detail': 'This survey has reached its maximum number of participants',
+                    'survey': survey_data,
+                    'status': 'full'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            return DRFResponse(survey_data)
+            
+        except Survey.DoesNotExist:
+            return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+    @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def qr_code_data(self, request, pk=None):
+        survey = self.get_object()
+        if not survey.token:
+            return DRFResponse(
+                {"error": "Survey does not have a token"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        base_url = request.build_absolute_uri('/')[:-1]  # Remove trailing slash
+        data = {
+            'survey_url': f"{base_url}/survey/{survey.token}",
+            'token': survey.token,
+            'qr_code_url': f"{base_url}/api/surveys/surveys/{survey.id}/qr_code/"
+        }
+        return DRFResponse(data)
+        
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
+    def qr_code(self, request, pk=None):
+        try:
+            survey = self.get_object()
+            
+            if not survey.token:
+                return DRFResponse({'detail': 'This survey does not have a token for public access'}, status=status.HTTP_400_BAD_REQUEST)
+                
+            # Generate the URL for the public survey
+            base_url = request.build_absolute_uri('/').rstrip('/')
+            survey_url = f"{base_url}/api/surveys/public?token={survey.token}"
+            
+            # Generate QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            
+            qr.add_data(survey_url)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Save QR code to BytesIO object
+            buffer = BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+            
+            # Return the image
+            return HttpResponse(buffer.getvalue(), content_type="image/png")
+            
+        except Survey.DoesNotExist:
+            return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
     
     def calculate_completion_rate(self, survey):
         total_starts = Response.objects.filter(survey=survey).count()
@@ -268,9 +366,9 @@ class ResponseViewSet(viewsets.ModelViewSet):
         if survey.max_participants and current_responses >= survey.max_participants:
             return DRFResponse({'detail': 'This survey has reached its maximum number of participants'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Check if survey has ended
-        if survey.end_date and survey.end_date < timezone.now():
-            return DRFResponse({'detail': 'This survey has ended'}, status=status.HTTP_400_BAD_REQUEST)
+        # Check if survey has expired
+        if survey.expiry_date and survey.expiry_date < timezone.now():
+            return DRFResponse({'detail': 'This survey has expired'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Generate a session ID if not provided
         session_id = request.data.get('session_id')
@@ -278,7 +376,7 @@ class ResponseViewSet(viewsets.ModelViewSet):
             import uuid
             session_id = str(uuid.uuid4())
         
-        response = Response.objects.create(survey=survey, session_id=session_id)
+        response = Response.objects.create(survey=survey, session_id=session_id, language=language)
         
         # Process the answers
         required_questions = set(Question.objects.filter(survey=survey, is_required=True).values_list('id', flat=True))
@@ -286,62 +384,35 @@ class ResponseViewSet(viewsets.ModelViewSet):
         
         for answer_data in answers_data:
             question_id = answer_data.get('question')
-            
             try:
                 question = Question.objects.get(id=question_id, survey=survey)
+                if question.is_required:
+                    answered_required.add(question_id)
+                
+                Answer.objects.create(
+                    response=response,
+                    question=question,
+                    nps_rating=answer_data.get('nps_rating'),
+                    text_answer=answer_data.get('text_answer')
+                )
             except Question.DoesNotExist:
-                continue
-                
-            # Track answered required questions
-            if question.is_required:
-                answered_required.add(question.id)
-                
-            # Validate the answer based on question type
-            if question.type == 'nps':
-                nps_rating = answer_data.get('nps_rating')
-                if nps_rating is None:
-                    continue
-                
-                # Ensure NPS rating is between 0 and 10
-                nps_rating = max(0, min(10, int(nps_rating)))
-                
-                Answer.objects.create(
-                    response=response,
-                    question=question,
-                    nps_rating=nps_rating
-                )
-                
-            elif question.type == 'free_text':
-                text_answer = answer_data.get('text_answer')
-                if not text_answer:
-                    continue
-                    
-                Answer.objects.create(
-                    response=response,
-                    question=question,
-                    text_answer=text_answer
-                )
+                pass
         
         # Check if all required questions were answered
-        missing_required = required_questions - answered_required
-        
-        if missing_required:
-            # Delete the response if required questions are missing
-            response.delete()
-            missing_questions = Question.objects.filter(id__in=missing_required)
-            missing_texts = [f"{q.question}" for q in missing_questions]
-            
-            return DRFResponse({
-                'detail': 'Required questions missing answers',
-                'missing_questions': list(missing_required),
-                'missing_texts': missing_texts
-            }, status=status.HTTP_400_BAD_REQUEST)
+        missing_questions = Question.objects.filter(id__in=required_questions - answered_required)
+        if missing_questions.exists():
+            response.delete()  # Clean up the incomplete response
+            missing_texts = [f"{q.questions.get(language, q.questions.get('en', 'Untitled Question'))}" 
+                           for q in missing_questions]
+            return DRFResponse(
+                {'detail': f'Please answer all required questions: {", ".join(missing_texts)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         return DRFResponse({
             'detail': 'Response submitted successfully',
-            'response_id': response.id,
-            'session_id': session_id
-        }, status=status.HTTP_201_CREATED)
+            'response_id': response.id
+        })
 
 
 class DashboardViewSet(viewsets.ViewSet):

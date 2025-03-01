@@ -6,8 +6,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeftIcon, PencilIcon } from '@heroicons/react/24/outline';
-import { getSurvey } from '@/lib/services/survey-service';
+import { ArrowLeftIcon, PencilIcon, QrCodeIcon } from '@heroicons/react/24/outline';
+import { getSurvey, getSurveyQRCodeData } from '@/lib/services/survey-service';
 import { Survey } from '@/types/survey';
 import { handleAuthError } from '@/lib/auth-utils';
 import { useToast } from '@/components/ui/use-toast';
@@ -20,6 +20,7 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [surveyId, setSurveyId] = useState<string | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<{survey_url: string, token: string, qr_code_url: string} | null>(null);
 
   useEffect(() => {
     async function fetchSurvey() {
@@ -48,27 +49,29 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
         const data = await getSurvey(parsedId);
         console.log('Survey data received:', data);
         setSurvey(data);
-      } catch (error: any) {
-        console.error('Error fetching survey:', error);
         
-        // Handle authentication errors
-        const isAuthError = await handleAuthError(error);
-        if (!isAuthError) {
-          const errorMessage = error.data?.detail || error.message || 'Failed to load survey';
-          setError(errorMessage);
-          toast({
-            title: "Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
+        // Fetch QR code data if survey has token
+        if (data.token) {
+          try {
+            const qrData = await getSurveyQRCodeData(parsedId);
+            setQrCodeData(qrData);
+          } catch (qrError) {
+            console.error('Error fetching QR code data:', qrError);
+            // Don't set error state, just log it - not critical
+          }
         }
-      } finally {
+        
         setLoading(false);
+      } catch (err: any) {
+        console.error('Error fetching survey:', err);
+        setError(err.message || 'Failed to load survey');
+        setLoading(false);
+        handleAuthError(err);
       }
     }
 
     fetchSurvey();
-  }, [params, toast]);
+  }, [params, router, toast]);
 
   if (loading) {
     return (
@@ -209,7 +212,7 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">Short ID</h3>
-              <p className="mt-1">{survey.short_id || '-'}</p>
+              <p className="mt-1">{survey.title.substring(0, 10) || '-'}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">Project Description</h3>
@@ -222,17 +225,154 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
           </div>
         </Card>
 
+        {/* QR Code & Public Access */}
+        {survey.token && (
+          <Card className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Public Access</h2>
+              <Badge variant="outline">
+                {qrCodeData ? 'Available' : 'QR Code Unavailable'}
+              </Badge>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Survey Token</h3>
+                  <div className="flex items-center mt-1 gap-2">
+                    <Badge variant="secondary" className="text-md px-3 py-1">
+                      {survey.token}
+                    </Badge>
+                  </div>
+                </div>
+                
+                {qrCodeData && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Public Survey Link</h3>
+                    <div className="mt-1">
+                      <a 
+                        href={`/survey/${survey.token}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline break-all"
+                      >
+                        {window.location.origin}/survey/{survey.token}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Debug Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      // Test direct API access
+                      const qrUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/surveys/surveys/${surveyId}/qr_code/`;
+                      window.open(qrUrl, '_blank');
+                      
+                      toast({
+                        title: "Debug Info",
+                        description: `Opening QR code directly from: ${qrUrl}`,
+                      });
+                    } catch (err: any) {
+                      toast({
+                        title: "Debug Error",
+                        description: err.message,
+                        variant: "destructive"
+                      });
+                    }
+                  }}
+                >
+                  Debug: Open QR Code Directly
+                </Button>
+                
+                <p className="text-sm text-gray-500 mt-2">
+                  Share this link or QR code for participants to access the survey without logging in.
+                </p>
+              </div>
+              
+              {qrCodeData && (
+                <div className="flex justify-center items-center border rounded-lg p-4">
+                  <div className="text-center">
+                    <div className="mb-2">
+                      <a href={qrCodeData.qr_code_url} target="_blank" rel="noopener noreferrer">
+                        <img 
+                          src={qrCodeData.qr_code_url} 
+                          alt="Survey QR Code" 
+                          className="max-w-[200px] mx-auto"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null; 
+                            toast({
+                              title: "QR Code Error",
+                              description: `Failed to load image from: ${qrCodeData.qr_code_url}`,
+                              variant: "destructive"
+                            });
+                            e.currentTarget.src = "data:image/svg+xml;charset=utf-8,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui'%3EImage Error%3C/text%3E%3C/svg%3E";
+                          }}
+                        />
+                      </a>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Scan to access survey
+                    </p>
+                    <p className="text-xs text-blue-500 mt-2">
+                      <a href={qrCodeData.qr_code_url} target="_blank" rel="noopener noreferrer">
+                        Open QR code in new tab
+                      </a>
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {!qrCodeData && survey.token && (
+                <div className="flex justify-center items-center border rounded-lg p-4 bg-gray-50">
+                  <div className="text-center">
+                    <p className="text-sm text-gray-500">
+                      QR Code data could not be loaded.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={async () => {
+                        try {
+                          const data = await getSurveyQRCodeData(surveyId || '');
+                          setQrCodeData(data);
+                          toast({
+                            title: "Success",
+                            description: "QR code data loaded successfully",
+                          });
+                        } catch (err: any) {
+                          toast({
+                            title: "Error",
+                            description: err.message || "Failed to load QR code data",
+                            variant: "destructive"
+                          });
+                        }
+                      }}
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
         {/* Location */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Location</h2>
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Street Number</h3>
-              <p className="mt-1">{survey.street_number || '-'}</p>
+              <h3 className="text-sm font-medium text-gray-500">Street</h3>
+              <p className="mt-1">{survey.street || '-'}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">City Code</h3>
-              <p className="mt-1">{survey.city_code || '-'}</p>
+              <h3 className="text-sm font-medium text-gray-500">Postal Code</h3>
+              <p className="mt-1">{survey.postal_code || '-'}</p>
             </div>
             <div>
               <h3 className="text-sm font-medium text-gray-500">City</h3>

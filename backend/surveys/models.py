@@ -63,12 +63,13 @@ class Survey(models.Model):
     format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='online')
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='public')
     max_participants = models.PositiveIntegerField(default=100)
-    end_date = models.DateTimeField(blank=True, null=True)
+    expiry_date = models.DateTimeField(blank=True, null=True)
     analysis_end_date = models.DateTimeField(blank=True, null=True)
     analysis_cluster = models.CharField(max_length=50, choices=ANALYSIS_CLUSTER_CHOICES, default='Standard', blank=True, null=True)
     
     # End Survey Information
     end_survey_titles = models.JSONField(default=dict, blank=True, help_text="Titles to show at the end of survey for each language")
+    end_survey_texts = models.JSONField(default=dict, blank=True, help_text="Messages to show at the end of survey for each language")
     expired_survey_titles = models.JSONField(default=dict, blank=True, help_text="Expired survey titles for each language")
     expired_survey_texts = models.JSONField(default=dict, blank=True, help_text="Expired survey texts for each language")
     

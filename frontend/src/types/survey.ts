@@ -12,22 +12,22 @@ export interface SurveyQuestion {
 }
 
 export interface Survey {
-  id: string;
+  id: number;
   title: string;
   description?: string;
   headlines?: Record<string, string>; // Multilingual headlines 
   survey_texts?: Record<string, string>; // Multilingual descriptions
-  created_at: string;
-  updated_at: string;
-  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+  is_active?: boolean;
   questions: SurveyQuestion[];
   languages: string[];
-  format: 'online' | 'face_to_face';
-  type: 'friends_family' | 'public' | 'professional' | 'single_company' | 'intracompany';
+  format?: string;
+  type?: string;
   max_participants?: number;
   end_date?: string;
   analysis_end_date?: string;
-  analysis_cluster?: 'Standard' | 'CoreNet Event' | 'Event & Conference' | 'HomeOffice';
+  analysis_cluster?: string;
   
   // End Survey Information
   end_survey_title?: string;
@@ -58,16 +58,20 @@ export interface Survey {
   
   // Additional fields
   expiry_date?: string | Date;
+  short_id?: string;
+  street_number?: string;
+  city_code?: string;
+  created_by?: number;
+  status?: 'active' | 'expired' | 'inactive' | 'full';
 }
 
 export interface SurveyStats {
-  response_count: number;
-  nps_score?: number;
-  response_by_language: Record<string, number>;
-  question_stats: Array<{
-    question_id: string;
-    question_text: string;
-    avg_rating?: number; // For NPS questions
-    responses?: number;
-  }>;
+  total_responses: number;
+  responses_by_language: Array<{language: string, count: number}>;
+  nps_average: number;
+  nps_score: number;
+  completion_rate: number;
+  promoters: number;
+  detractors: number;
+  passives: number;
 } 

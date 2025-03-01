@@ -13,6 +13,7 @@ class QuestionSerializer(serializers.ModelSerializer):
 
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
+    response_count = serializers.SerializerMethodField()
     
     class Meta:
         model = Survey
@@ -29,15 +30,23 @@ class SurveySerializer(serializers.ModelSerializer):
             'token',
             # Project Details
             'languages', 'format', 'type', 'max_participants',
-            'end_date', 'analysis_end_date', 'analysis_cluster',
+            'expiry_date', 'analysis_end_date', 'analysis_cluster',
             # End Survey Information
-            'end_survey_titles', 'expired_survey_titles', 'expired_survey_texts',
+            'end_survey_titles', 'end_survey_texts', 'expired_survey_titles', 'expired_survey_texts',
             # Metadata
             'created_by', 'created_at', 'updated_at', 'is_active',
             # Related
-            'questions'
+            'questions',
+            # Stats
+            'response_count'
         ]
-        read_only_fields = ['created_by', 'created_at', 'updated_at']
+        read_only_fields = ['created_by', 'created_at', 'updated_at', 'response_count']
+
+    def get_response_count(self, obj):
+        """
+        Return the number of responses for this survey
+        """
+        return Response.objects.filter(survey=obj).count()
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
@@ -67,6 +76,8 @@ class SurveySerializer(serializers.ModelSerializer):
 
 
 class AnswerSerializer(serializers.ModelSerializer):
+    question = QuestionSerializer(read_only=True)
+    
     class Meta:
         model = Answer
         fields = ['id', 'question', 'nps_rating', 'text_answer', 'sentiment_score', 'created_at']
@@ -74,7 +85,7 @@ class AnswerSerializer(serializers.ModelSerializer):
 
 
 class ResponseSerializer(serializers.ModelSerializer):
-    answers = AnswerSerializer(many=True)
+    answers = AnswerSerializer(many=True, read_only=True)
     
     class Meta:
         model = Response
@@ -82,7 +93,7 @@ class ResponseSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
     def create(self, validated_data):
-        answers_data = validated_data.pop('answers')
+        answers_data = validated_data.pop('answers', [])
         response = Response.objects.create(**validated_data)
         
         for answer_data in answers_data:

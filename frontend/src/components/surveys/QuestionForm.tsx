@@ -176,15 +176,16 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
               ))}
 
               {/* Placeholder for each language */}
-              {watch(`questions.${index}.type`) === 'free_text' && languages.map(lang => (
+              {languages.map(lang => (
                 <div key={`${field.id}-${lang}-placeholder`} className="space-y-2">
                   <Label htmlFor={`questions.${index}.placeholders.${lang}`}>
                     Placeholder - {lang.toUpperCase()}
                   </Label>
-                  <Input
+                  <Textarea
                     id={`questions.${index}.placeholders.${lang}`}
                     {...register(`questions.${index}.placeholders.${lang}`)}
                     placeholder={`Enter placeholder in ${lang.toUpperCase()}`}
+                    className="min-h-[80px]"
                   />
                 </div>
               ))}
@@ -214,4 +215,4 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
       )}
     </div>
   );
-} 
+}
