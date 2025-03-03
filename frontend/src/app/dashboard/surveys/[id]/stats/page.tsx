@@ -1,7 +1,8 @@
 // This is a Server Component
 import { SurveyStatsClient } from "./SurveyStatsClient";
 
-export default function SurveyStatsPage({ params }: { params: { id: string } }) {
-  // Extract the id in a Server Component, which is safe
-  return <SurveyStatsClient surveyId={params.id} />;
+// Simplified approach - no server-side access to params
+export default function SurveyStatsPage() {
+  // The client component will automatically get the ID from the route using useParams
+  return <SurveyStatsClient />;
 } 

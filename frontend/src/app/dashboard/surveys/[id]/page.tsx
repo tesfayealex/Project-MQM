@@ -6,6 +6,6 @@ export const metadata: Metadata = {
   description: 'View and manage your survey details',
 }
 
-export default function SurveyDetailPage({ params }: { params: { id: string } }) {
+export default async function SurveyDetailPage({ params }: { params: { id: string } }) {
   return <SurveyDetail params={params} />
 } 

@@ -10,7 +10,7 @@ export const metadata = {
   description: 'Edit your survey details and questions',
 };
 
-export default function EditSurveyPage({ params }: { params: { id: string } }) {
+export default async function EditSurveyPage({ params }: { params: { id: string } }) {
   return (
     <div className="container mx-auto py-10 space-y-6">
       <div className="flex justify-between items-center">

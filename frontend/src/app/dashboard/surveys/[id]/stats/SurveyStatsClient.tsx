@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,12 +48,17 @@ interface Response {
 }
 
 interface SurveyStatsClientProps {
-  surveyId: string;
+  surveyId?: string; // Make surveyId optional
 }
 
-export function SurveyStatsClient({ surveyId }: SurveyStatsClientProps) {
+export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClientProps) {
   const router = useRouter();
+  const params = useParams();
   const { toast } = useToast();
+  
+  // Get surveyId from props or from route params
+  const surveyId = propsSurveyId || (params?.id as string);
+  
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [stats, setStats] = useState<any | null>(null);
   const [responses, setResponses] = useState<Response[]>([]);
@@ -73,20 +78,33 @@ export function SurveyStatsClient({ surveyId }: SurveyStatsClientProps) {
         
         // Then fetch the statistics
         const statsData = await getSurveyStats(surveyId);
+        console.log('Stats data (raw received):', statsData);
         console.log('Stats data (detailed):', JSON.stringify(statsData, null, 2));
+        
+        // Add type checking for debugging
+        console.log('Stats data types:', {
+          nps_average: typeof statsData.nps_average,
+          nps_score: typeof statsData.nps_score,
+          promoters: typeof statsData.promoters,
+          passives: typeof statsData.passives,
+          detractors: typeof statsData.detractors
+        });
         
         // Validate and ensure stats data has expected properties
         const validatedStats = {
           ...statsData,
-          total_responses: statsData?.total_responses || 0,
-          promoters: statsData?.promoters || 0,
-          passives: statsData?.passives || 0,
-          detractors: statsData?.detractors || 0,
-          nps_average: statsData?.nps_average ?? 0,
-          nps_score: statsData?.nps_score ?? 0,
-          completion_rate: statsData?.completion_rate || 0,
+          // Use nullish coalescing to preserve 0 values but replace null/undefined
+          total_responses: statsData?.total_responses ?? 0,
+          promoters: statsData?.promoters ?? 0,
+          passives: statsData?.passives ?? 0,
+          detractors: statsData?.detractors ?? 0,
+          // These can be null/undefined if no data, which is expected
+          nps_average: statsData?.nps_average,
+          nps_score: statsData?.nps_score,
+          completion_rate: statsData?.completion_rate ?? 0,
         };
         
+        console.log('Validated stats data to be used:', validatedStats);
         setStats(validatedStats);
         
         // Finally fetch responses for this survey
@@ -159,22 +177,22 @@ export function SurveyStatsClient({ surveyId }: SurveyStatsClientProps) {
   }
 
   // Calculate NPS categories if available
-  const promoters = stats?.promoters || 0;
-  const passives = stats?.passives || 0;
-  const detractors = stats?.detractors || 0;
-  const totalResponses = stats?.total_responses || 0;
+  const promoters = stats?.promoters ?? 0;
+  const passives = stats?.passives ?? 0;
+  const detractors = stats?.detractors ?? 0;
+  const totalResponses = stats?.total_responses ?? 0;
   const totalNpsResponses = promoters + passives + detractors;
   
   // Ensure NPS score calculation is displayed correctly
   let npsScore: number | string = 'N/A';
-  if (stats?.nps_score !== undefined) {
+  if (stats?.nps_score !== undefined && stats?.nps_score !== null) {
     npsScore = stats.nps_score;
   } else if (totalNpsResponses > 0) {
     // Calculate it ourselves if the backend didn't provide it
     npsScore = Math.round(((promoters - detractors) / totalNpsResponses) * 100);
   }
   
-  const npsAverage = stats?.nps_average !== undefined ? stats.nps_average : 'N/A';
+  const npsAverage = stats?.nps_average !== undefined && stats?.nps_average !== null ? stats.nps_average : 'N/A';
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -382,43 +400,52 @@ export function SurveyStatsClient({ surveyId }: SurveyStatsClientProps) {
                                      'Untitled Question') : 'Question data unavailable'}
                                 </TableCell>
                                 <TableCell>
-                                  {answer.question?.type === 'nps' ? (
-                                    <div className="flex items-center space-x-2">
-                                      <span className="text-lg font-bold">{answer.nps_rating}</span>
-                                      {answer.nps_rating !== undefined && (
-                                        <Badge 
-                                          className={
-                                            answer.nps_rating >= 9 ? "bg-green-500" : 
-                                            answer.nps_rating >= 7 ? "bg-yellow-500" : 
-                                            "bg-red-500"
-                                          }
-                                        >
-                                          {answer.nps_rating >= 9 ? "Promoter" : 
-                                           answer.nps_rating >= 7 ? "Passive" : 
-                                           "Detractor"}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      {answer.text_answer || <span className="text-muted-foreground">No response</span>}
-                                      {answer.sentiment_score !== undefined && (
-                                        <div className="mt-1">
-                                          <Badge variant="outline" className={
-                                            answer.sentiment_score > 0.3 ? "text-green-500 border-green-200" :
-                                            answer.sentiment_score < -0.3 ? "text-red-500 border-red-200" :
-                                            "text-yellow-500 border-yellow-200"
-                                          }>
-                                            Sentiment: {
-                                              answer.sentiment_score > 0.3 ? "Positive" :
-                                              answer.sentiment_score < -0.3 ? "Negative" :
-                                              "Neutral"
+                                  {(() => {
+                                    // Debug logs outside JSX
+                                    if (answer.question?.type === 'nps') {
+                                      console.log(`NPS Rating for answer ${answer.id}:`, answer.nps_rating);
+                                    } else {
+                                      console.log(`Text answer for ${answer.id}:`, answer.text_answer, typeof answer.text_answer);
+                                    }
+                                    
+                                    return answer.question?.type === 'nps' ? (
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-lg font-bold">{answer.nps_rating !== undefined ? answer.nps_rating : 'No rating'}</span>
+                                        {answer.nps_rating !== undefined && (
+                                          <Badge 
+                                            className={
+                                              answer.nps_rating >= 9 ? "bg-green-500" : 
+                                              answer.nps_rating >= 7 ? "bg-yellow-500" : 
+                                              "bg-red-500"
                                             }
+                                          >
+                                            {answer.nps_rating >= 9 ? "Promoter" : 
+                                             answer.nps_rating >= 7 ? "Passive" : 
+                                             "Detractor"}
                                           </Badge>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        {answer.text_answer !== undefined ? answer.text_answer : <span className="text-muted-foreground">No answer</span>}
+                                        {answer.sentiment_score !== undefined && (
+                                          <div className="mt-1">
+                                            <Badge variant="outline" className={
+                                              answer.sentiment_score > 0.3 ? "text-green-500 border-green-200" :
+                                              answer.sentiment_score < -0.3 ? "text-red-500 border-red-200" :
+                                              "text-yellow-500 border-yellow-200"
+                                            }>
+                                              Sentiment: {
+                                                answer.sentiment_score > 0.3 ? "Positive" :
+                                                answer.sentiment_score < -0.3 ? "Negative" :
+                                                "Neutral"
+                                              }
+                                            </Badge>
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </TableCell>
                               </TableRow>
                             ))}
