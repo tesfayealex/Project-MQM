@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Survey, Question, Response, Answer
+from .models import Survey, Question, Response, Answer, SurveyToken
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -11,9 +11,27 @@ class QuestionSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
 
+class SurveyTokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SurveyToken
+        fields = ['id', 'token', 'description', 'created_at']
+        read_only_fields = ['created_at']
+    
+    def validate_token(self, value):
+        """
+        Check that the token contains only lowercase letters, no special characters, no spaces.
+        """
+        if value and (not value.islower() or not value.isalnum()):
+            raise serializers.ValidationError(
+                "Token must contain only lowercase letters and numbers, no special characters or spaces."
+            )
+        return value
+
+
 class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     response_count = serializers.SerializerMethodField()
+    tokens = SurveyTokenSerializer(many=True, read_only=True)
     
     class Meta:
         model = Survey
@@ -26,8 +44,10 @@ class SurveySerializer(serializers.ModelSerializer):
             'building_name', 'short_id', 'project_description',
             # Project Address
             'street_number', 'city_code', 'city', 'country',
-            # Project Token
+            # Project Token (legacy)
             'token',
+            # Project Tokens (new)
+            'tokens',
             # Project Details
             'languages', 'format', 'type', 'max_participants',
             'expiry_date', 'analysis_end_date', 'analysis_cluster',
@@ -38,9 +58,11 @@ class SurveySerializer(serializers.ModelSerializer):
             # Related
             'questions',
             # Stats
-            'response_count'
+            'response_count',
+            # Properties
+            'primary_token'
         ]
-        read_only_fields = ['created_by', 'created_at', 'updated_at', 'response_count']
+        read_only_fields = ['created_by', 'created_at', 'updated_at', 'response_count', 'primary_token']
 
     def get_response_count(self, obj):
         """
@@ -49,8 +71,20 @@ class SurveySerializer(serializers.ModelSerializer):
         return Response.objects.filter(survey=obj).count()
 
     def create(self, validated_data):
+        # Extract tokens data if present
+        tokens_data = self.context.get('request').data.get('tokens', [])
         validated_data['created_by'] = self.context['request'].user
-        return super().create(validated_data)
+        survey = super().create(validated_data)
+        
+        # Create tokens if provided
+        for token_data in tokens_data:
+            SurveyToken.objects.create(
+                survey=survey,
+                token=token_data.get('token'),
+                description=token_data.get('description', 'Token')
+            )
+        
+        return survey
 
     def validate_token(self, value):
         """
@@ -61,7 +95,7 @@ class SurveySerializer(serializers.ModelSerializer):
                 "Token must contain only lowercase letters and numbers, no special characters or spaces."
             )
         return value
-        
+
     def validate_languages(self, value):
         """
         Validate that the languages are in the allowed choices
@@ -73,6 +107,45 @@ class SurveySerializer(serializers.ModelSerializer):
                     f"Language '{lang}' is not supported. Valid options are: {', '.join(valid_languages)}"
                 )
         return value
+
+    def update(self, instance, validated_data):
+        # Update the survey instance
+        survey = super().update(instance, validated_data)
+        
+        # Handle tokens update if present in the request data
+        tokens_data = self.context.get('request').data.get('tokens')
+        if tokens_data is not None:
+            # First, we'll gather existing token IDs to determine what to keep
+            existing_token_ids = set(survey.tokens.values_list('id', flat=True))
+            
+            # Track the IDs that are updated
+            updated_token_ids = set()
+            
+            # Update existing tokens and create new ones
+            for token_data in tokens_data:
+                token_id = token_data.get('id')
+                
+                # If this token has an ID, update the existing record
+                if token_id and token_id in existing_token_ids:
+                    token = SurveyToken.objects.get(id=token_id)
+                    token.token = token_data.get('token', token.token)
+                    token.description = token_data.get('description', token.description)
+                    token.save()
+                    updated_token_ids.add(token_id)
+                else:
+                    # Create a new token
+                    SurveyToken.objects.create(
+                        survey=survey,
+                        token=token_data.get('token'),
+                        description=token_data.get('description', 'Token')
+                    )
+            
+            # Delete tokens that weren't included in the update
+            tokens_to_delete = existing_token_ids - updated_token_ids
+            if tokens_to_delete:
+                SurveyToken.objects.filter(id__in=tokens_to_delete).delete()
+        
+        return survey
 
 
 class AnswerSerializer(serializers.ModelSerializer):
@@ -89,7 +162,7 @@ class ResponseSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Response
-        fields = ['id', 'survey', 'created_at', 'session_id', 'language', 'answers']
+        fields = ['id', 'survey', 'created_at', 'session_id', 'language', 'answers', 'token', 'survey_token']
         read_only_fields = ['created_at']
 
     def create(self, validated_data):

@@ -76,6 +76,11 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PASSWORD', ''),
         'HOST': os.getenv('DB_HOST', 'localhost'),
         'PORT': os.getenv('DB_PORT', '5432'),
+        'OPTIONS': {
+            'connect_timeout': 10,
+        },
+        'ATOMIC_REQUESTS': True,  # Wrap each request in a transaction
+        'CONN_MAX_AGE': 60,  # Keep connections alive for 60 seconds
     }
 }
 

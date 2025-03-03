@@ -5,17 +5,22 @@ from django.db.models import Count, Avg, Q
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import User
-from .models import Survey, Question, Response, Answer
+from .models import Survey, Question, Response, Answer, SurveyToken
 from .serializers import (
     SurveySerializer, 
     SurveyDetailSerializer,
     QuestionSerializer, 
     ResponseSerializer, 
-    AnswerSerializer
+    AnswerSerializer,
+    SurveyTokenSerializer
 )
 from django.http import HttpResponse
 import qrcode
 from io import BytesIO
+from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class IsCreatorOrReadOnly(permissions.BasePermission):
@@ -153,7 +158,15 @@ class SurveyViewSet(viewsets.ModelViewSet):
             return DRFResponse({'detail': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
             
         try:
-            survey = Survey.objects.get(token=token)
+            # Find survey by token - looking at both legacy token field and SurveyToken model
+            try:
+                # First try to find a survey using the SurveyToken model
+                survey_token = SurveyToken.objects.get(token=token)
+                survey = survey_token.survey
+            except SurveyToken.DoesNotExist:
+                # If not found, try the legacy token field
+                survey = Survey.objects.get(token=token)
+            
             serializer = SurveyDetailSerializer(survey)
             survey_data = serializer.data
             
@@ -184,37 +197,118 @@ class SurveyViewSet(viewsets.ModelViewSet):
             
             return DRFResponse(survey_data)
             
-        except Survey.DoesNotExist:
+        except (Survey.DoesNotExist, SurveyToken.DoesNotExist):
             return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
-            
+    
     @action(detail=True, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def qr_code_data(self, request, pk=None):
         survey = self.get_object()
-        if not survey.token:
+        
+        # Check if survey has any tokens
+        token_objects = survey.tokens.all()
+        if not token_objects.exists() and not survey.token:
             return DRFResponse(
-                {"error": "Survey does not have a token"},
+                {"error": "Survey does not have any tokens"},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         base_url = request.build_absolute_uri('/')[:-1]  # Remove trailing slash
-        data = {
-            'survey_url': f"{base_url}/survey/{survey.token}",
-            'token': survey.token,
-            'qr_code_url': f"{base_url}/api/surveys/surveys/{survey.id}/qr_code/"
-        }
-        return DRFResponse(data)
         
+        # Get all token data including legacy token if present
+        token_data = []
+        
+        # Add SurveyToken objects
+        for token_obj in token_objects:
+            token_data.append({
+                'id': token_obj.id,
+                'token': token_obj.token,
+                'description': token_obj.description,
+                'survey_url': f"{base_url}/survey/{token_obj.token}",
+                'qr_code_url': f"{base_url}/api/surveys/surveys/token/{token_obj.token}/qr_code/"
+            })
+        
+        # If there's a legacy token, include it too
+        if survey.token and not token_objects.filter(token=survey.token).exists():
+            token_data.append({
+                'id': None,
+                'token': survey.token,
+                'description': 'Legacy Token',
+                'survey_url': f"{base_url}/survey/{survey.token}",
+                'qr_code_url': f"{base_url}/api/surveys/surveys/token/{survey.token}/qr_code/"
+            })
+        
+        # If no tokens exist, return error
+        if not token_data:
+            return DRFResponse(
+                {"error": "Survey does not have any tokens"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Return all token data
+        return DRFResponse({
+            'tokens': token_data,
+            'primary_token': survey.primary_token
+        })
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.AllowAny], url_path='token/(?P<token>[^/.]+)/qr_code')
+    def token_qr_code(self, request, token=None):
+        """Generate QR code for a specific token"""
+        if not token:
+            return DRFResponse({'detail': 'Token is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Find survey by token - looking at both legacy token field and SurveyToken model
+            try:
+                # First try to find a survey using the SurveyToken model
+                survey_token = SurveyToken.objects.get(token=token)
+                survey = survey_token.survey
+            except SurveyToken.DoesNotExist:
+                # If not found, try the legacy token field
+                survey = Survey.objects.get(token=token)
+            
+            # Generate the URL for the public survey
+            base_url = request.build_absolute_uri('/').rstrip('/')
+            survey_url = f"{base_url}/api/surveys/public?token={token}"
+            
+            # Generate QR code
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_L,
+                box_size=10,
+                border=4,
+            )
+            
+            qr.add_data(survey_url)
+            qr.make(fit=True)
+            
+            img = qr.make_image(fill_color="black", back_color="white")
+            
+            # Save QR code to BytesIO object
+            buffer = BytesIO()
+            img.save(buffer, format="PNG")
+            buffer.seek(0)
+            
+            # Return the image
+            return HttpResponse(buffer.getvalue(), content_type="image/png")
+            
+        except (Survey.DoesNotExist, SurveyToken.DoesNotExist):
+            return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
+
     @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
     def qr_code(self, request, pk=None):
+        """Legacy endpoint for backward compatibility - uses the primary token"""
         try:
             survey = self.get_object()
             
-            if not survey.token:
+            # Get the primary token
+            primary_token = survey.primary_token
+            
+            if not primary_token:
                 return DRFResponse({'detail': 'This survey does not have a token for public access'}, status=status.HTTP_400_BAD_REQUEST)
                 
             # Generate the URL for the public survey
             base_url = request.build_absolute_uri('/').rstrip('/')
-            survey_url = f"{base_url}/api/surveys/public?token={survey.token}"
+            survey_url = f"{base_url}/api/surveys/public?token={primary_token}"
             
             # Generate QR code
             qr = qrcode.QRCode(
@@ -239,7 +333,46 @@ class SurveyViewSet(viewsets.ModelViewSet):
             
         except Survey.DoesNotExist:
             return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
-    
+
+    # New endpoint for managing tokens
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def add_token(self, request, pk=None):
+        """Add a new token to the survey"""
+        survey = self.get_object()
+        
+        # Validate token data
+        serializer = SurveyTokenSerializer(data=request.data)
+        if serializer.is_valid():
+            # Check if token already exists
+            token = serializer.validated_data['token']
+            if SurveyToken.objects.filter(token=token).exists() or Survey.objects.filter(token=token).exclude(id=survey.id).exists():
+                return DRFResponse({'detail': 'Token already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create the token
+            serializer.save(survey=survey)
+            return DRFResponse(serializer.data, status=status.HTTP_201_CREATED)
+        
+        return DRFResponse(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['delete'], permission_classes=[permissions.IsAuthenticated], url_path='token/(?P<token_id>\d+)')
+    def delete_token(self, request, pk=None, token_id=None):
+        """Delete a token from the survey"""
+        survey = self.get_object()
+        
+        try:
+            token = SurveyToken.objects.get(id=token_id, survey=survey)
+            
+            # Check if this is the only token
+            if survey.tokens.count() <= 1:
+                return DRFResponse({'detail': 'Cannot delete the only token. Surveys must have at least one token.'}, 
+                                  status=status.HTTP_400_BAD_REQUEST)
+            
+            token.delete()
+            return DRFResponse(status=status.HTTP_204_NO_CONTENT)
+        
+        except SurveyToken.DoesNotExist:
+            return DRFResponse({'detail': 'Token not found'}, status=status.HTTP_404_NOT_FOUND)
+
     def calculate_completion_rate(self, survey):
         total_starts = Response.objects.filter(survey=survey).count()
         if total_starts == 0:
@@ -340,10 +473,16 @@ class ResponseViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
     @action(detail=False, methods=['post'])
+    @transaction.atomic
     def submit_response(self, request):
         survey_id = request.data.get('survey')
         language = request.data.get('language', 'en')
         answers_data = request.data.get('answers', [])
+        token = request.data.get('token')  # Get the token from the request
+        
+        # Log request data for debugging
+        logger.info(f"Submit response request data: {request.data}")
+        logger.info(f"Token received in request: {token}")
         
         try:
             survey = Survey.objects.get(id=survey_id)
@@ -376,12 +515,36 @@ class ResponseViewSet(viewsets.ModelViewSet):
             import uuid
             session_id = str(uuid.uuid4())
         
-        response = Response.objects.create(survey=survey, session_id=session_id, language=language)
+        # Find SurveyToken if it exists
+        survey_token = None
+        if token:
+            try:
+                survey_token = SurveyToken.objects.get(token=token, survey=survey)
+            except SurveyToken.DoesNotExist:
+                # If not found in SurveyToken model, check if it matches the legacy token
+                if survey.token == token:
+                    # It's a legacy token
+                    pass
+                else:
+                    # Invalid token
+                    return DRFResponse({'detail': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Create response with token information
+        response = Response.objects.create(
+            survey=survey, 
+            session_id=session_id, 
+            language=language,
+            token=token,
+            survey_token=survey_token
+        )
         
         # Process the answers
         required_questions = set(Question.objects.filter(survey=survey, is_required=True).values_list('id', flat=True))
         answered_required = set()
         
+        logger.info(f"Processing {len(answers_data)} answers for response {response.id}")
+        
+        created_answers = []
         for answer_data in answers_data:
             question_id = answer_data.get('question')
             try:
@@ -389,14 +552,22 @@ class ResponseViewSet(viewsets.ModelViewSet):
                 if question.is_required:
                     answered_required.add(question_id)
                 
-                Answer.objects.create(
+                answer = Answer.objects.create(
                     response=response,
                     question=question,
                     nps_rating=answer_data.get('nps_rating'),
                     text_answer=answer_data.get('text_answer')
                 )
+                created_answers.append(answer.id)
+                logger.info(f"Created answer {answer.id} for question {question_id}")
             except Question.DoesNotExist:
+                logger.warning(f"Question {question_id} not found for survey {survey.id}")
                 pass
+            except Exception as e:
+                logger.error(f"Error creating answer for question {question_id}: {str(e)}")
+                raise
+        
+        logger.info(f"Successfully created {len(created_answers)} answers for response {response.id}")
         
         # Check if all required questions were answered
         missing_questions = Question.objects.filter(id__in=required_questions - answered_required)

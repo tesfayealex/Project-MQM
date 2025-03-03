@@ -82,6 +82,57 @@ class Survey(models.Model):
     def __str__(self):
         return self.title or self.short_id
 
+    @property
+    def primary_token(self):
+        """Returns the first token from the related tokens or the legacy token field."""
+        token_obj = self.tokens.first()
+        if token_obj:
+            return token_obj.token
+        return self.token
+        
+    def save(self, *args, **kwargs):
+        """Override save to create a default token if none exists."""
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        # After saving, if this is a new survey and it has a token but no SurveyToken objects,
+        # create a SurveyToken for backward compatibility
+        if is_new and self.token and not self.tokens.exists():
+            SurveyToken.objects.create(
+                survey=self,
+                token=self.token,
+                description="Default Token"
+            )
+        # Alternatively, if new and no token exists at all, create a default token
+        elif is_new and not self.tokens.exists():
+            import random
+            import string
+            # Generate a random token
+            random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+            SurveyToken.objects.create(
+                survey=self,
+                token=random_token,
+                description="Default Token"
+            )
+
+
+class SurveyToken(models.Model):
+    """
+    Model to represent multiple access tokens for a single survey.
+    Each token can be used to access the survey, allowing for A/B testing
+    by separating the survey for different areas/people.
+    """
+    survey = models.ForeignKey(Survey, related_name='tokens', on_delete=models.CASCADE)
+    token = models.CharField(max_length=100, unique=True, help_text="Only lowercase letters, no special characters, no spaces")
+    description = models.CharField(max_length=255, help_text="Description of the token's purpose (e.g., 'Group A', 'Office Staff')")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"{self.token} ({self.description})"
+
 
 class Question(models.Model):
     QUESTION_TYPES = [
@@ -113,6 +164,8 @@ class Response(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     session_id = models.CharField(max_length=100, unique=True)
     language = models.CharField(max_length=2, choices=Survey.LANGUAGE_CHOICES, default='en', help_text="Language used for this response")
+    token = models.CharField(max_length=100, blank=True, null=True, help_text="The token used to access this survey")
+    survey_token = models.ForeignKey(SurveyToken, related_name='responses', on_delete=models.SET_NULL, null=True, blank=True, help_text="Reference to the specific token used (if available)")
 
     def __str__(self):
         return f"Response to {self.survey.title} ({self.created_at})"
