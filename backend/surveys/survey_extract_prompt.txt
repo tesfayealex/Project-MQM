@@ -1,0 +1,46 @@
+You are a data annotator tasked with categorizing pre-extracted words from survey answers into predefined clusters. The survey answers are in German, but the clusters are in English. You will be provided with the survey answer, the pre-extracted words along with their English translations, and a list of predefined clusters.
+
+Your Task
+
+For each pre-extracted word, assign it to one of the predefined clusters based on the context of the survey answer. If a word does not fit any of the predefined clusters, create a new cluster that best describes its category. Use the context of the survey answer to guide your categorization decisions.
+
+Rules for Categorization
+
+Follow these rules to ensure accurate and consistent categorization:
+
+Assign Each Word to One Cluster
+Each word should be assigned to only one cluster.
+Handle Evaluation Words (Adjectives)
+Evaluation words (such as adjectives like "super" or "gut") describe specific aspects of the event. Assign them to the same cluster as the aspect they are evaluating.
+For example, if "super" describes "thema" (topic), and "thema" is categorized under "Event," then "super" should also be categorized under "Event."
+Use Context to Guide Decisions
+Consider the overall meaning of the survey answer to understand the role of each word. For instance, in "Super Thema, gutes Timing zum Messebeginn" (Great topic, good timing for the trade fair start), "thema" refers to the event's topic, and "gut" evaluates the timing.
+Create New Clusters if Necessary
+
+Response Format
+
+Provide your categorization in JSON format, where each key is a pre-extracted word and its value is the assigned cluster (either predefined or newly created).
+
+Example
+
+To help you understand the expected output, here is an example based on a sample survey answer:
+
+Survey Answer: "Super Thema, gutes Timing zum Messebeginn" 
+Pre-extracted Words: ["super" , "thema" , "gut" ]
+Predefined Clusters: change_cluster
+Expected Output:
+
+{  
+  "thema": "Event",  
+  "gut": "Event"  
+}  
+Explanation:
+
+"thema" (topic) is a core aspect of the event, so it fits under "Event."
+"super" (great) describes "thema," so it is also categorized under "Event." But the context already can be explained with them (which is the main word in the context "super thema" hence we don't return super)
+"gut" (good) evaluates "Timing" (implied in the survey answer), which relates to the event's organization, so it fits under "Event."
+Additional Guidance
+
+Always consider the context of the entire survey answer when categorizing words.
+If multiple words relate to the same aspect (e.g., "super" and "thema" both relate to the topic), assign them to the same cluster.
+If a word could fit multiple clusters, choose the one that best matches its meaning in the given context.

@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SentimentChart } from '@/components/analysis/SentimentChart';
 import { WordCloudChart } from '@/components/analysis/WordCloudChart';
 import { ClusterList } from '@/components/analysis/ClusterList';
-import { getSurveyAnalysisSummary, getWordCloud, analyzeResponses } from '@/lib/services/analysis-service';
+import { getSurveyAnalysisSummary, getWordCloud, getClusterCloud, analyzeResponses, processAllResponses } from '@/lib/services/analysis-service';
 import { SurveyAnalysisSummary, WordCloudItem } from '@/types/analysis';
 import { Loader2, BanIcon, PieChart, BarChart, GlobeIcon } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -27,8 +27,48 @@ import {
   Line
 } from 'recharts';
 
+// Define interfaces for chart components
+interface LanguageBreakdown {
+  [key: string]: number;
+}
+
+interface LanguageDistributionChartProps {
+  breakdown: LanguageBreakdown;
+}
+
+interface SatisfactionMetricsChartProps {
+  average: number;
+  median: number;
+  low: number;
+  high: number;
+}
+
+interface SentimentDivergenceChartProps {
+  divergence: number;
+  positivePercentage: number;
+  negativePercentage: number;
+  neutralPercentage: number;
+}
+
+// Add interface definitions for component props
+interface SentimentChartProps {
+  positive: number;
+  negative: number;
+  neutral: number;
+  improved?: boolean;
+}
+
+interface ClusterListProps {
+  clusters: any[];
+  title: string;
+  showVisualizations?: boolean;
+  positiveTheme?: boolean;
+  negativeTheme?: boolean;
+  neutralTheme?: boolean;
+}
+
 // New component to visualize language breakdown
-const LanguageDistributionChart = ({ breakdown }) => {
+const LanguageDistributionChart = ({ breakdown }: LanguageDistributionChartProps) => {
   const data = Object.entries(breakdown).map(([lang, count]) => ({
     name: lang.toUpperCase(),
     value: count,
@@ -54,7 +94,12 @@ const LanguageDistributionChart = ({ breakdown }) => {
               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
             ))}
           </Pie>
-          <Tooltip formatter={(value) => [`${value} responses`, 'Count']} />
+          <Tooltip formatter={(value) => {
+            if (typeof value === 'number') {
+              return [`${value.toFixed(1)}%`];
+            }
+            return [`${value}%`];
+          }} />
         </RechartPieChart>
       </ResponsiveContainer>
     </div>
@@ -62,7 +107,7 @@ const LanguageDistributionChart = ({ breakdown }) => {
 };
 
 // New component for satisfaction metrics visualization
-const SatisfactionMetricsChart = ({ average, median, low, high }) => {
+const SatisfactionMetricsChart = ({ average, median, low, high }: SatisfactionMetricsChartProps) => {
   const data = [
     { name: 'Average', value: average },
     { name: 'Median', value: median }
@@ -104,7 +149,7 @@ const SatisfactionMetricsChart = ({ average, median, low, high }) => {
 };
 
 // New component for sentiment divergence visualization
-const SentimentDivergenceChart = ({ divergence, positivePercentage, negativePercentage, neutralPercentage }) => {
+const SentimentDivergenceChart = ({ divergence, positivePercentage, negativePercentage, neutralPercentage }: SentimentDivergenceChartProps) => {
   const data = [
     { name: 'Positive', value: positivePercentage },
     { name: 'Negative', value: negativePercentage },
@@ -125,7 +170,12 @@ const SentimentDivergenceChart = ({ divergence, positivePercentage, negativePerc
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis type="number" domain={[0, 100]} />
             <YAxis type="category" dataKey="name" />
-            <Tooltip formatter={(value) => [`${value.toFixed(1)}%`]} />
+            <Tooltip formatter={(value) => {
+              if (typeof value === 'number') {
+                return [`${value.toFixed(1)}%`];
+              }
+              return [`${value}%`];
+            }} />
             <Bar dataKey="value" fill="#8884d8" />
           </RechartBarChart>
         </ResponsiveContainer>
@@ -156,7 +206,10 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
   const [analyzing, setAnalyzing] = useState(false);
   const [summary, setSummary] = useState<SurveyAnalysisSummary | null>(null);
   const [wordCloud, setWordCloud] = useState<WordCloudItem[]>([]);
+  const [clusterCloud, setClusterCloud] = useState<WordCloudItem[]>([]);
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
+  const [wordCloudMode, setWordCloudMode] = useState<'words' | 'clusters'>('words');
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
     loadAnalysisData();
@@ -165,6 +218,7 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
   useEffect(() => {
     if (summary) {
       loadWordCloud();
+      loadClusterCloud();
     }
   }, [selectedLanguage, summary]);
 
@@ -218,6 +272,22 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
     }
   }
 
+  async function loadClusterCloud() {
+    if (!surveyId) return;
+
+    try {
+      const clusters = await getClusterCloud(surveyId);
+      setClusterCloud(clusters || []);
+    } catch (error: any) {
+      setClusterCloud([]);
+      toast({
+        title: "Error loading cluster cloud",
+        description: error.message || "Failed to load cluster cloud data",
+        variant: "destructive"
+      });
+    }
+  }
+
   async function handleAnalyze(reset: boolean = false) {
     if (!surveyId) return;
 
@@ -240,6 +310,47 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
     }
   }
 
+  async function handleProcessAllResponses() {
+    if (!surveyId) return;
+
+    try {
+      setProcessing(true);
+      const result = await processAllResponses(surveyId);
+      
+      // Show a more detailed toast with cluster information
+      toast({
+        title: "Processing Complete",
+        description: `${result.message} Found ${result.cluster_count} custom clusters.`,
+      });
+      
+      // Reload analysis data to reflect the changes
+      await loadAnalysisData();
+      
+      // If there are clusters in the result, show them
+      if (result.clusters && result.clusters.length > 0) {
+        // Display info about the top 3 clusters
+        const topClusters = result.clusters.slice(0, 3);
+        const clusterInfo = topClusters.map(c => 
+          `${c.name} (${c.response_frequencies} responses, avg NPS: ${c.avg_nps ? c.avg_nps.toFixed(1) : 'N/A'})`
+        ).join(', ');
+        
+        toast({
+          title: "Top Clusters",
+          description: `Top clusters include: ${clusterInfo}`,
+          duration: 5000,
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Processing Failed",
+        description: error.message || "Failed to process survey responses",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessing(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -253,18 +364,51 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
       <div className="p-6">
         <Card className="p-4">
           <p className="text-center text-gray-600">No analysis data available</p>
+          <div className="flex space-x-2 mb-4">
           <Button
             onClick={() => handleAnalyze(true)}
             disabled={analyzing}
-            className="mt-4"
+              variant="outline"
+            >
+              {analyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>Reset & Analyze</>
+              )}
+            </Button>
+            
+            <Button 
+              onClick={() => handleAnalyze()} 
+              disabled={analyzing}
           >
             {analyzing ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Analyzing...
               </>
-            ) : "Start Analysis"}
+              ) : (
+                <>Analyze</>
+              )}
+            </Button>
+            
+            <Button 
+              onClick={handleProcessAllResponses} 
+              disabled={processing}
+              variant="secondary"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>Process All Responses</>
+              )}
           </Button>
+          </div>
         </Card>
       </div>
     );
@@ -301,7 +445,7 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
         <TabsList className="grid grid-cols-5 w-full">
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="detailed">Detailed Analysis</TabsTrigger>
-          <TabsTrigger value="clusters">Clustered Items</TabsTrigger>
+          <TabsTrigger value="clusters">Custom Clusters</TabsTrigger>
           <TabsTrigger value="responses">All Responses</TabsTrigger>
           <TabsTrigger value="competitors">Competitors</TabsTrigger>
         </TabsList>
@@ -377,37 +521,104 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
           <Card className="p-4">
             <h3 className="text-lg font-semibold mb-3">Word Cloud</h3>
             <div className="mb-4">
-              <div className="flex items-center space-x-2">
-                <GlobeIcon className="w-5 h-5 text-blue-500" />
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="border rounded p-2"
-                >
-                  {summary?.language_breakdown && Object.keys(summary.language_breakdown).length > 0 ? (
-                    Object.keys(summary.language_breakdown).map(lang => (
-                      <option key={lang} value={lang}>
-                        {lang.toUpperCase()} ({summary.language_breakdown[lang]} responses)
-                      </option>
-                    ))
-                  ) : (
-                    <option value="en">EN</option>
-                  )}
-                </select>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <GlobeIcon className="w-5 h-5 text-blue-500" />
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    className="border rounded p-2"
+                  >
+                    {summary?.language_breakdown && Object.keys(summary.language_breakdown).length > 0 ? (
+                      Object.keys(summary.language_breakdown).map(lang => (
+                        <option key={lang} value={lang}>
+                          {lang.toUpperCase()} ({summary.language_breakdown[lang]} responses)
+                        </option>
+                      ))
+                    ) : (
+                      <option value="en">EN</option>
+                    )}
+                  </select>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="border rounded overflow-hidden flex">
+                    <button
+                      onClick={() => setWordCloudMode('words')}
+                      className={`px-3 py-1 ${wordCloudMode === 'words' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+                    >
+                      Words
+                    </button>
+                    <button
+                      onClick={() => setWordCloudMode('clusters')}
+                      className={`px-3 py-1 ${wordCloudMode === 'clusters' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+                    >
+                      Clusters
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="h-64">
-              <WordCloudChart words={wordCloud} />
+              <WordCloudChart 
+                words={wordCloudMode === 'words' ? wordCloud : clusterCloud} 
+                displayMode={wordCloudMode} 
+              />
             </div>
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="p-4">
-              <ClusterList
-                clusters={summary.top_clusters_data?.slice(0, 10) || []}
-                title="Frequently Mentioned Clusters (Top 10)"
-                showVisualizations={true}
-              />
+              <h3 className="text-lg font-semibold mb-3 flex items-center">
+                <BarChart className="w-5 h-5 mr-2 text-blue-500" />
+                Top Custom Clusters by Frequency
+              </h3>
+              <div className="overflow-auto max-h-64 pr-2">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cluster Name</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Freq.</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">NPS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {summary.top_clusters_data?.slice(0, 10).map((cluster, index) => (
+                      <tr key={cluster.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                          <span className={`inline-block w-5 text-center ${
+                            cluster.is_positive ? "text-green-600" : 
+                            cluster.is_negative ? "text-red-600" : 
+                            "text-yellow-600"
+                          }`}>{index + 1}</span> {cluster.name}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">{cluster.frequency}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                          <span className={
+                            cluster.sentiment_score > 0 ? "text-green-600" :
+                            cluster.sentiment_score < 0 ? "text-red-600" :
+                            "text-gray-600"
+                          }>
+                            {cluster.sentiment_score.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                          {cluster.nps_score !== null ? 
+                            <span className={
+                              cluster.nps_score >= 9 ? "text-green-600" :
+                              cluster.nps_score <= 6 ? "text-red-600" :
+                              "text-yellow-600"
+                            }>
+                              {cluster.nps_score.toFixed(1)}
+                            </span> : 
+                            <span className="text-gray-400">-</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </Card>
 
             <Card className="p-4">
@@ -452,14 +663,280 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
           <ComingSoonPlaceholder title="Detailed Analysis" />
         </TabsContent>
 
-        {/* CLUSTERED ITEMS TAB */}
-        <TabsContent value="clusters">
-          <ComingSoonPlaceholder title="Clustered Items" />
+        {/* CLUSTERS TAB */}
+        <TabsContent value="clusters" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4">Top Custom Clusters by Frequency</h3>
+              <div className="overflow-auto max-h-64 pr-2">
+                <table className="min-w-full">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cluster Name</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Freq.</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">NPS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {summary.top_clusters_data?.slice(0, 10).map((cluster, index) => (
+                      <tr key={cluster.id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">
+                          <span className={`inline-block w-5 text-center ${
+                            cluster.is_positive ? "text-green-600" : 
+                            cluster.is_negative ? "text-red-600" : 
+                            "text-yellow-600"
+                          }`}>{index + 1}</span> {cluster.name}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">{cluster.frequency}</td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                          <span className={
+                            cluster.sentiment_score > 0 ? "text-green-600" :
+                            cluster.sentiment_score < 0 ? "text-red-600" :
+                            "text-gray-600"
+                          }>
+                            {cluster.sentiment_score.toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                          {cluster.nps_score !== null ? 
+                            <span className={
+                              cluster.nps_score >= 9 ? "text-green-600" :
+                              cluster.nps_score <= 6 ? "text-red-600" :
+                              "text-yellow-600"
+                            }>
+                              {cluster.nps_score.toFixed(1)}
+                            </span> : 
+                            <span className="text-gray-400">-</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <Card className="p-4 col-span-2">
+              <h3 className="text-lg font-semibold mb-4">Custom Cluster Analysis</h3>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>Positive Custom Clusters</span>
+                  <span className="font-semibold text-green-600">{summary.top_positive_clusters?.length || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Negative Custom Clusters</span>
+                  <span className="font-semibold text-red-600">{summary.top_negative_clusters?.length || 0}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>Neutral Custom Clusters</span>
+                  <span className="font-semibold text-yellow-600">{summary.top_neutral_clusters?.length || 0}</span>
+                </div>
+                <div className="flex items-center justify-between border-t pt-2">
+                  <span>Total Custom Clusters</span>
+                  <span className="font-semibold">{summary.top_clusters?.length || 0}</span>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          <Card className="p-4">
+            <h3 className="text-lg font-semibold mb-4">All Custom Clusters in Survey Responses</h3>
+            <div className="overflow-auto max-h-96">
+              <table className="min-w-full">
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-10">#</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cluster Name</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Frequency</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment</th>
+                    <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {summary.top_clusters_data?.map((cluster, index) => (
+                    <tr key={cluster.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">{index + 1}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm font-medium">{cluster.name}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-right">{cluster.frequency}</td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                        <span className={
+                          cluster.sentiment_score > 0 ? "text-green-600" :
+                          cluster.sentiment_score < 0 ? "text-red-600" :
+                          "text-gray-600"
+                        }>
+                          {cluster.sentiment_score.toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-sm text-center">
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          cluster.is_positive ? "bg-green-100 text-green-800" : 
+                          cluster.is_negative ? "bg-red-100 text-red-800" : 
+                          "bg-yellow-100 text-yellow-800"
+                        }`}>
+                          {cluster.is_positive ? "Positive" : 
+                          cluster.is_negative ? "Negative" : 
+                          "Neutral"}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4 text-green-700">Positive Custom Clusters</h3>
+              <div className="overflow-auto max-h-96">
+                <table className="min-w-full">
+                  <thead className="bg-green-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-green-700 uppercase tracking-wider">Cluster Name</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-green-700 uppercase tracking-wider">Freq</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-green-700 uppercase tracking-wider">NPS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {summary.top_positive_clusters_data?.map((cluster, index) => (
+                      <tr key={cluster.id} className="hover:bg-green-50">
+                        <td className="px-3 py-2 text-sm font-medium">{cluster.name}</td>
+                        <td className="px-3 py-2 text-sm text-right">{cluster.frequency}</td>
+                        <td className="px-3 py-2 text-sm text-right">
+                          {cluster.nps_score !== null ? 
+                            <span>{cluster.nps_score.toFixed(1)}</span> : 
+                            <span className="text-gray-400">-</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4 text-red-700">Negative Custom Clusters</h3>
+              <div className="overflow-auto max-h-96">
+                <table className="min-w-full">
+                  <thead className="bg-red-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-red-700 uppercase tracking-wider">Cluster Name</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-red-700 uppercase tracking-wider">Freq</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-red-700 uppercase tracking-wider">NPS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {summary.top_negative_clusters_data?.map((cluster, index) => (
+                      <tr key={cluster.id} className="hover:bg-red-50">
+                        <td className="px-3 py-2 text-sm font-medium">{cluster.name}</td>
+                        <td className="px-3 py-2 text-sm text-right">{cluster.frequency}</td>
+                        <td className="px-3 py-2 text-sm text-right">
+                          {cluster.nps_score !== null ? 
+                            <span>{cluster.nps_score.toFixed(1)}</span> : 
+                            <span className="text-gray-400">-</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <h3 className="text-lg font-semibold mb-4 text-yellow-700">Neutral Custom Clusters</h3>
+              <div className="overflow-auto max-h-96">
+                <table className="min-w-full">
+                  <thead className="bg-yellow-50 sticky top-0">
+                    <tr>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-yellow-700 uppercase tracking-wider">Cluster Name</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-yellow-700 uppercase tracking-wider">Freq</th>
+                      <th className="px-3 py-2 text-right text-xs font-medium text-yellow-700 uppercase tracking-wider">NPS</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {summary.top_neutral_clusters_data?.map((cluster, index) => (
+                      <tr key={cluster.id} className="hover:bg-yellow-50">
+                        <td className="px-3 py-2 text-sm font-medium">{cluster.name}</td>
+                        <td className="px-3 py-2 text-sm text-right">{cluster.frequency}</td>
+                        <td className="px-3 py-2 text-sm text-right">
+                          {cluster.nps_score !== null ? 
+                            <span>{cluster.nps_score.toFixed(1)}</span> : 
+                            <span className="text-gray-400">-</span>
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
         </TabsContent>
 
         {/* ALL RESPONSES TAB */}
         <TabsContent value="responses">
-          <ComingSoonPlaceholder title="All Responses" />
+          <Card className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold">All Survey Responses</h2>
+              <Button 
+                onClick={handleProcessAllResponses} 
+                disabled={processing}
+                variant="secondary"
+              >
+                {processing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing Responses...
+                  </>
+                ) : (
+                  <>Process All Responses</>
+                )}
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              <p className="text-gray-600">
+                This feature allows you to process all unprocessed text responses in this survey. 
+                The system will extract words and phrases from each response and associate them with 
+                appropriate word clusters.
+              </p>
+              
+              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+                <h3 className="font-medium text-blue-800 mb-2">About Word Processing</h3>
+                <ul className="list-disc pl-5 text-blue-700 space-y-1">
+                  <li>Words are extracted from text responses using natural language processing</li>
+                  <li>Each word is matched against active custom word clusters</li>
+                  <li>Words are stored with their original context for better analysis</li>
+                  <li>Processing happens automatically for new responses, use this button for bulk processing</li>
+                </ul>
+              </div>
+              
+              <div className="mt-6">
+                <h3 className="font-medium mb-2">Survey Statistics</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white p-4 rounded-md border">
+                    <p className="text-gray-500 text-sm">Total Responses</p>
+                    <p className="text-2xl font-bold">{summary.response_count}</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-md border">
+                    <p className="text-gray-500 text-sm">Languages</p>
+                    <p className="text-2xl font-bold">{Object.keys(summary.language_breakdown || {}).length}</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-md border">
+                    <p className="text-gray-500 text-sm">Word Clusters</p>
+                    <p className="text-2xl font-bold">{summary.top_clusters?.length || 0}</p>
+                  </div>
+                  <div className="bg-white p-4 rounded-md border">
+                    <p className="text-gray-500 text-sm">Sentiment Score</p>
+                    <p className="text-2xl font-bold">{summary.satisfaction_score?.toFixed(1) || "N/A"}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
         </TabsContent>
 
         {/* COMPETITORS TAB */}

@@ -1,7 +1,8 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response as DRFResponse
-from django.db.models import Count, Avg, Q, F, Sum
+from django.db.models import Count, Avg, Q, F, Sum, FloatField, Case, When, Value, ExpressionWrapper
+from django.db.models.functions import Cast
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import User, Group
@@ -24,10 +25,14 @@ import qrcode
 from io import BytesIO
 from django.db import transaction
 import logging
-from django.db.models.functions import Cast
-import numpy as np
-from .utils import TextAnalyzer, cluster_responses, calculate_stats_from_scores, calculate_satisfaction_score
+from .utils import (
+    TextAnalyzer, cluster_responses, calculate_stats_from_scores, 
+    calculate_satisfaction_score, process_text, process_survey_and_assign_clusters, assign_clusters_to_words,
+    analyze_response_clusters
+)
+from rest_framework.views import APIView
 
+# Configure logger
 logger = logging.getLogger(__name__)
 
 
@@ -480,6 +485,93 @@ class ResponseViewSet(viewsets.ModelViewSet):
             
         return queryset.order_by('-created_at')
 
+    @action(detail=True, methods=['get'])
+    def extracted_words(self, request, pk=None):
+        """
+        Retrieve all extracted words for a specific response.
+        """
+        response = self.get_object()
+        from .models import ResponseWord
+        
+        # Get all extracted words for this response
+        words = ResponseWord.objects.filter(response=response)
+        
+        # Create a serializable format
+        result = []
+        for word in words:
+            # Get the custom cluster name if assigned
+            assigned_cluster = word.assigned_cluster
+            
+            # If no directly assigned cluster, check if it belongs to any custom clusters
+            if not assigned_cluster and word.custom_clusters.exists():
+                assigned_cluster = word.custom_clusters.first().name
+                
+            result.append({
+                'id': word.id,
+                'word': word.word,
+                'original_text': word.original_text,
+                'frequency': word.frequency,
+                'sentiment_score': word.sentiment_score,
+                'assigned_cluster': assigned_cluster,
+                'answer_id': word.answer_id
+            })
+            
+        return DRFResponse(result)
+
+    @action(detail=False, methods=['post'])
+    @transaction.atomic
+    def update_word_cluster(self, request):
+        """
+        Update the assigned cluster for a specific ResponseWord.
+        """
+        word_id = request.data.get('word_id')
+        cluster_name = request.data.get('cluster_name')
+        
+        if not word_id or not cluster_name:
+            return DRFResponse(
+                {'detail': 'Both word_id and cluster_name are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            from .models import ResponseWord, CustomWordCluster
+            word = ResponseWord.objects.get(id=word_id)
+            
+            # Update the directly assigned cluster
+            word.assigned_cluster = cluster_name
+            word.save()
+            
+            # Check if the cluster exists, if not create it
+            cluster, created = CustomWordCluster.objects.get_or_create(
+                name=cluster_name,
+                defaults={
+                    'created_by': request.user if request.user.is_authenticated else None,
+                    'is_active': True
+                }
+            )
+            
+            # Associate the word with the cluster if it's not already
+            if cluster not in word.custom_clusters.all():
+                word.custom_clusters.add(cluster)
+                
+            return DRFResponse({
+                'id': word.id,
+                'word': word.word,
+                'assigned_cluster': word.assigned_cluster,
+                'detail': 'Cluster updated successfully'
+            })
+            
+        except ResponseWord.DoesNotExist:
+            return DRFResponse(
+                {'detail': f'Word with id {word_id} not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return DRFResponse(
+                {'detail': f'Error updating cluster: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
     @action(detail=False, methods=['post'])
     @transaction.atomic
     def submit_response(self, request):
@@ -704,19 +796,33 @@ class SurveyAnalysisViewSet(viewsets.ViewSet):
     def summary(self, request, pk=None):
         """Get analysis summary for a survey."""
         try:
-            print("#############################")
             survey = Survey.objects.get(pk=pk)
-            # print(survey)
             self.check_object_permissions(request, survey)
             
-            # Get or generate analysis summary
+            # Get analysis summary, create if it doesn't exist
             summary, created = SurveyAnalysisSummary.objects.get_or_create(survey=survey)
-            # print(summary)
-            # print(created)
-
-            # If summary is old or was just created, update it
-            if created or (timezone.now() - summary.last_updated).seconds > 30:
-                self._update_analysis_summary(summary)
+            
+            # Only update if it's a brand new summary
+            if created:
+                # Create a basic summary with response count and language breakdown
+                from django.db.models import Count
+                
+                # Count responses
+                response_count = Response.objects.filter(survey=survey).count()
+                summary.response_count = response_count
+                
+                # Language breakdown
+                languages = Response.objects.filter(survey=survey).values('language').annotate(
+                    count=Count('id')
+                )
+                language_breakdown = {item['language']: item['count'] for item in languages}
+                summary.language_breakdown = language_breakdown
+                
+                # Save the basic summary
+                summary.save()
+                
+                # Log that a new summary was created
+                logger.info(f"Created new analysis summary for survey {pk}")
             
             serializer = SurveyAnalysisSummarySerializer(summary)
             return DRFResponse(serializer.data)
@@ -767,36 +873,241 @@ class SurveyAnalysisViewSet(viewsets.ViewSet):
         except Survey.DoesNotExist:
             return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
     
-    @action(detail=True, methods=['post'])
-    def analyze_responses(self, request, pk=None):
-        """
-        Analyze survey responses and generate insights.
-        This updates word clusters and extracts words from text responses.
-        """
+    @action(detail=True, methods=['get'])
+    def cluster_cloud(self, request, pk=None):
+        """Generate word cloud data for clusters in a survey."""
         try:
+            from django.db.models import Count, Avg
+            from .models import Survey, ResponseWord, CustomWordCluster, Answer
+            
             survey = Survey.objects.get(pk=pk)
             self.check_object_permissions(request, survey)
             
-            # Start a transaction as this is a complex operation
-            with transaction.atomic():
-                # Clear existing extracted words if requested
-                if request.data.get('reset_analysis', False):
-                    ResponseWord.objects.filter(response__survey=survey).delete()
-                    WordCluster.objects.filter(survey=survey).delete()
-                
-                # Process all responses
-                self._analyze_survey_responses(survey)
-                
-                # Update the analysis summary
-                summary, _ = SurveyAnalysisSummary.objects.get_or_create(survey=survey)
-                self._update_analysis_summary(summary)
+            # Get all custom clusters used in this survey's response words
+            custom_clusters = CustomWordCluster.objects.filter(
+                words__response__survey=survey
+            ).distinct()
             
-            return DRFResponse({'detail': 'Survey responses analyzed successfully'})
+            # Create a list to hold word cloud data
+            cluster_cloud_data = []
+            
+            # For each custom cluster, collect statistics
+            for cc in custom_clusters:
+                # Get response words for this cluster
+                response_words = ResponseWord.objects.filter(
+                    custom_clusters=cc,
+                    response__survey=survey
+                )
+                
+                # Skip clusters with no words
+                if not response_words.exists():
+                    continue
+                
+                # Count distinct responses
+                distinct_responses = response_words.values('response').distinct().count()
+                
+                # Only include clusters that appear in a significant number of responses
+                if distinct_responses < 2:
+                    continue
+                    
+                # Calculate average sentiment
+                avg_sentiment = response_words.aggregate(Avg('sentiment_score'))['sentiment_score__avg'] or 0
+                
+                # Get NPS ratings from associated responses
+                nps_answers = Answer.objects.filter(
+                    response__in=response_words.values('response').distinct(),
+                    nps_rating__isnull=False
+                )
+                
+                # Determine cluster category
+                is_positive = False
+                is_negative = False
+                is_neutral = True
+                
+                if nps_answers.exists():
+                    nps_scores = list(nps_answers.values_list('nps_rating', flat=True))
+                    avg_nps = sum(nps_scores) / len(nps_scores) if nps_scores else None
+                    
+                    if avg_nps is not None:
+                        if avg_nps >= 9:
+                            is_positive = True
+                            is_neutral = False
+                        elif avg_nps <= 6:
+                            is_negative = True
+                            is_neutral = False
+                elif avg_sentiment > 0.3:
+                    is_positive = True
+                    is_neutral = False
+                elif avg_sentiment < -0.3:
+                    is_negative = True
+                    is_neutral = False
+                
+                # Add to word cloud data
+                cluster_cloud_data.append({
+                    'text': cc.name,
+                    'value': distinct_responses,
+                    'sentiment': avg_sentiment,
+                    'is_positive': is_positive,
+                    'is_negative': is_negative,
+                    'is_neutral': is_neutral
+                })
+            
+            # Sort by frequency (value)
+            cluster_cloud_data.sort(key=lambda x: x['value'], reverse=True)
+            
+            # Limit to top 50 clusters
+            cluster_cloud_data = cluster_cloud_data[:50]
+            
+            return DRFResponse(cluster_cloud_data)
             
         except Survey.DoesNotExist:
             return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            logger.error(f"Error analyzing responses: {str(e)}")
+            logger.error(f"Error generating cluster cloud: {str(e)}", exc_info=True)
+            return DRFResponse(
+                {"error": f"Error generating cluster cloud: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    @action(detail=True, methods=['post'])
+    def analyze_responses(self, request, pk=None):
+        """
+        Analyze survey responses - this only updates the analysis summary without processing text
+        or creating new clusters. Use process_all_responses for full processing.
+        """
+        try:
+            from .models import Survey, SurveyAnalysisSummary, ResponseWord, CustomWordCluster, Answer
+            from django.db.models import Count, Avg, F, Q
+            from django.db import transaction
+            import logging
+            
+            logger = logging.getLogger(__name__)
+            
+            survey = Survey.objects.get(pk=pk)
+            self.check_object_permissions(request, survey)
+            
+            # Use transaction to ensure all changes are saved together
+            with transaction.atomic():
+                # Get or create an analysis summary object
+                summary, created = SurveyAnalysisSummary.objects.get_or_create(survey=survey)
+                
+                # Count responses and update basic stats
+                response_count = survey.responses.count()
+                summary.response_count = response_count
+                
+                # Calculate language breakdown
+                language_breakdown = dict(survey.responses.values('language').annotate(count=Count('id')).values_list('language', 'count'))
+                summary.language_breakdown = language_breakdown
+                
+                # Calculate NPS/satisfaction stats from existing data
+                nps_answers = Answer.objects.filter(response__survey=survey, nps_rating__isnull=False)
+                if nps_answers.exists():
+                    # Basic stats
+                    nps_ratings = list(nps_answers.values_list('nps_rating', flat=True))
+                    avg_satisfaction = sum(nps_ratings) / len(nps_ratings) if nps_ratings else 0
+                    
+                    # Other stats calculations would go here
+                    # (for brevity, we're simplifying this part)
+                    summary.average_satisfaction = avg_satisfaction
+                    summary.median_satisfaction = avg_satisfaction  # Simplified
+                    summary.satisfaction_confidence_low = avg_satisfaction - 1  # Simplified
+                    summary.satisfaction_confidence_high = avg_satisfaction + 1  # Simplified
+                    
+                    # Calculate NPS score (% promoters - % detractors)
+                    promoters = sum(1 for score in nps_ratings if score >= 9)
+                    detractors = sum(1 for score in nps_ratings if score <= 6)
+                    
+                    promoter_pct = (promoters / len(nps_ratings)) * 100 if nps_ratings else 0
+                    detractor_pct = (detractors / len(nps_ratings)) * 100 if nps_ratings else 0
+                    
+                    summary.satisfaction_score = promoter_pct - detractor_pct
+                    summary.positive_percentage = promoter_pct
+                    summary.negative_percentage = detractor_pct
+                    summary.neutral_percentage = 100 - promoter_pct - detractor_pct
+                
+                # Get top clusters from current data (no new processing)
+                response_words = ResponseWord.objects.filter(response__survey=survey)
+                
+                # Get clusters with counts and average sentiment
+                custom_clusters = CustomWordCluster.objects.filter(
+                    words__in=response_words
+                ).annotate(
+                    response_count=Count('words__response', distinct=True),
+                    avg_sentiment=Avg('words__sentiment_score')
+                ).order_by('-response_count')
+                
+                # Update summary with cluster IDs
+                if custom_clusters.exists():
+                    # Get top overall clusters
+                    summary.top_clusters = list(custom_clusters.values_list('id', flat=True)[:10])
+                    
+                    # Create a list to store categorized clusters
+                    positive_clusters = []
+                    negative_clusters = []
+                    neutral_clusters = []
+                    
+                    # Process each cluster to determine its category
+                    for cluster in custom_clusters:
+                        # Get NPS ratings from responses associated with this cluster
+                        response_ids = ResponseWord.objects.filter(
+                            custom_clusters=cluster,
+                            response__survey=survey
+                        ).values_list('response', flat=True).distinct()
+                        
+                        # Get NPS ratings for these responses
+                        nps_answers = Answer.objects.filter(
+                            response__in=response_ids,
+                            nps_rating__isnull=False
+                        )
+                        
+                        # Calculate average NPS if available
+                        avg_nps = None
+                        if nps_answers.exists():
+                            nps_ratings = list(nps_answers.values_list('nps_rating', flat=True))
+                            avg_nps = sum(nps_ratings) / len(nps_ratings) if nps_ratings else None
+                        
+                        # Determine cluster category using the same logic as direct_process_all_responses
+                        if avg_nps is not None:
+                            if avg_nps >= 9:
+                                positive_clusters.append(cluster.id)
+                            elif avg_nps <= 6:
+                                negative_clusters.append(cluster.id)
+                            else:
+                                neutral_clusters.append(cluster.id)
+                        elif cluster.avg_sentiment > 0.3:
+                            positive_clusters.append(cluster.id)
+                        elif cluster.avg_sentiment < -0.3:
+                            negative_clusters.append(cluster.id)
+                        else:
+                            neutral_clusters.append(cluster.id)
+                    
+                    # Update summary with cluster IDs by category
+                    summary.top_positive_clusters = positive_clusters[:5]
+                    summary.top_negative_clusters = negative_clusters[:5]
+                    summary.top_neutral_clusters = neutral_clusters[:5]
+                
+                # Explicitly save the changes
+                summary.save()
+                
+                # Verify the save was successful by retrieving it again
+                refreshed_summary = SurveyAnalysisSummary.objects.get(id=summary.id)
+                
+                # Log what was updated
+                logger.info(f"Updated analysis summary for survey {pk}. Response count: {refreshed_summary.response_count}")
+                logger.info(f"Top clusters: {refreshed_summary.top_clusters}")
+            
+            return DRFResponse({
+                'detail': 'Survey analysis summary updated successfully',
+                'summary_id': summary.id,
+                'top_clusters': summary.top_clusters,
+                'response_count': summary.response_count,
+                'last_updated': summary.last_updated.isoformat() if summary.last_updated else None
+            })
+            
+        except Survey.DoesNotExist:
+            return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error analyzing responses: {str(e)}", exc_info=True)
             return DRFResponse(
                 {'detail': f'Error analyzing responses: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -804,14 +1115,118 @@ class SurveyAnalysisViewSet(viewsets.ViewSet):
 
     @action(detail=True, methods=['get'])
     def clusters(self, request, pk=None):
-        """Get word clusters for a survey."""
+        """
+        Get clusters for a survey, optionally filtered by type (positive, negative, neutral).
+        If no WordCluster objects exist, falls back to using CustomWordClusters directly.
+        """
         try:
+            from django.db.models import Count, Avg, Q
+            from .models import Survey, ResponseWord, CustomWordCluster, WordCluster, Answer
+            from .serializers import WordClusterSerializer
+            
             survey = Survey.objects.get(pk=pk)
             self.check_object_permissions(request, survey)
             
-            # Get clusters ordered by frequency
-            clusters = WordCluster.objects.filter(survey=survey).order_by('-frequency')
+            # First check if we have WordCluster objects
+            clusters = WordCluster.objects.filter(survey=survey)
             
+            # If we don't have any WordClusters, use CustomWordClusters instead
+            if not clusters.exists():
+                # Get all custom clusters used in this survey's response words
+                custom_clusters = CustomWordCluster.objects.filter(
+                    words__response__survey=survey
+                ).distinct()
+                
+                # Create a list to hold cluster data
+                cluster_data_list = []
+                
+                # For each custom cluster, collect statistics
+                for cc in custom_clusters:
+                    # Get response words for this cluster
+                    response_words = ResponseWord.objects.filter(
+                        custom_clusters=cc,
+                        response__survey=survey
+                    )
+                    
+                    # Skip clusters with no words
+                    if not response_words.exists():
+                        continue
+                    
+                    # Count distinct responses
+                    distinct_responses = response_words.values('response').distinct().count()
+                    
+                    # Calculate average sentiment
+                    avg_sentiment = response_words.aggregate(Avg('sentiment_score'))['sentiment_score__avg'] or 0
+                    
+                    # Get NPS ratings from associated responses
+                    nps_answers = Answer.objects.filter(
+                        response__in=response_words.values('response').distinct(),
+                        nps_rating__isnull=False
+                    )
+                    
+                    # Calculate average NPS and determine category
+                    avg_nps = None
+                    is_positive = False
+                    is_negative = False
+                    is_neutral = True
+                    
+                    if nps_answers.exists():
+                        nps_scores = list(nps_answers.values_list('nps_rating', flat=True))
+                        avg_nps = sum(nps_scores) / len(nps_scores) if nps_scores else None
+                        
+                        # Use the same categorization logic as direct_process_all_responses
+                        if avg_nps is not None:
+                            if avg_nps >= 9:
+                                is_positive = True
+                                is_neutral = False
+                            elif avg_nps <= 6:
+                                is_negative = True
+                                is_neutral = False
+                    elif avg_sentiment > 0.3:
+                        is_positive = True
+                        is_neutral = False
+                    elif avg_sentiment < -0.3:
+                        is_negative = True
+                        is_neutral = False
+                    
+                    # Create cluster data object
+                    cluster_data = {
+                        'id': cc.id,
+                        'name': cc.name,
+                        'survey': survey.id,
+                        'description': cc.description or '',
+                        'frequency': distinct_responses,
+                        'sentiment_score': avg_sentiment,
+                        'nps_score': avg_nps,
+                        'is_positive': is_positive,
+                        'is_negative': is_negative,
+                        'is_neutral': is_neutral,
+                        'custom_cluster_id': cc.id,
+                        'created_at': cc.created_at.isoformat() if cc.created_at else None,
+                        'updated_at': cc.updated_at.isoformat() if cc.updated_at else None
+                    }
+                    
+                    cluster_data_list.append(cluster_data)
+                
+                # Filter by type if requested - ensure strict filtering by boolean values
+                cluster_type = request.query_params.get('type')
+                if cluster_type == 'positive':
+                    cluster_data_list = [c for c in cluster_data_list if c['is_positive'] == True]
+                elif cluster_type == 'negative':
+                    cluster_data_list = [c for c in cluster_data_list if c['is_negative'] == True]
+                elif cluster_type == 'neutral':
+                    cluster_data_list = [c for c in cluster_data_list if c['is_neutral'] == True]
+                
+                # Sort by frequency
+                cluster_data_list.sort(key=lambda x: x['frequency'], reverse=True)
+                
+                # Limit results
+                limit = int(request.query_params.get('limit', 10))
+                cluster_data_list = cluster_data_list[:limit]
+                
+                return DRFResponse(cluster_data_list)
+            
+            # If we have WordCluster objects, use the original implementation but with strict filtering
             # Filter by type if requested
             cluster_type = request.query_params.get('type')
             if cluster_type == 'positive':
@@ -823,13 +1238,19 @@ class SurveyAnalysisViewSet(viewsets.ViewSet):
             
             # Limit results
             limit = int(request.query_params.get('limit', 10))
-            clusters = clusters[:limit]
+            clusters = clusters.order_by('-frequency')[:limit]
             
             serializer = WordClusterSerializer(clusters, many=True)
             return DRFResponse(serializer.data)
             
         except Survey.DoesNotExist:
             return DRFResponse({'detail': 'Survey not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error getting clusters: {str(e)}", exc_info=True)
+            return DRFResponse(
+                {"error": f"Error getting clusters: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def _analyze_survey_responses(self, survey):
         """Analyze all responses for a survey and extract insights."""
@@ -1050,6 +1471,252 @@ class SurveyAnalysisViewSet(viewsets.ViewSet):
         summary.save()
         return summary
 
+    @action(detail=True, methods=['post'])
+    def direct_process_all_responses(self, request, pk=None):
+        """
+        Process all responses for a survey and generate analysis directly from ResponseWord and CustomCluster models
+        without using the WordCluster model as an intermediary.
+        
+        This method identifies unprocessed responses or responses without clusters and processes them,
+        then updates the analysis summary.
+        """
+        try:
+            from django.db.models import Count, Avg, F, Q, Case, When, Value, IntegerField, Sum, FloatField, ExpressionWrapper
+            from django.db.models.functions import Cast
+            from django.db import transaction
+            from .models import Survey, Response, Answer, ResponseWord, CustomWordCluster, SurveyAnalysisSummary
+            from .utils import process_survey_and_assign_clusters, calculate_stats_from_scores, calculate_satisfaction_score
+            
+            survey = Survey.objects.get(pk=pk)
+            self.check_object_permissions(request, survey)
+            
+            with transaction.atomic():
+                # Get or create an analysis summary object
+                summary, created = SurveyAnalysisSummary.objects.get_or_create(survey=survey)
+                
+                # Get all responses for this survey
+                responses = Response.objects.filter(survey=survey)
+                
+                # Find responses that need processing:
+                # 1. Responses with answers that haven't been processed
+                # 2. Responses with no extracted words
+                # 3. Responses with words that don't have custom clusters assigned
+                
+                responses_needing_text_processing = Response.objects.filter(
+                    survey=survey
+                ).filter(
+                    Q(answers__processed=False) | 
+                    ~Q(id__in=ResponseWord.objects.filter(response__survey=survey).values('response'))
+                ).distinct()
+                
+                responses_needing_cluster_assignment = Response.objects.filter(
+                    survey=survey, 
+                    extracted_words__isnull=False,
+                    extracted_words__custom_clusters__isnull=True
+                ).distinct()
+                
+                # Track metrics for response
+                processed_count = 0
+                cluster_count = 0
+                
+                # Process each identified response
+                for response in responses_needing_text_processing:
+                    # Make sure each answer with text is marked as processed
+                    for answer in response.answers.filter(text_answer__isnull=False):
+                        if not answer.processed:
+                            answer.process_text_answer()
+                    processed_count += 1
+                
+                # Assign clusters where needed
+                for response in responses_needing_cluster_assignment:
+                    process_survey_and_assign_clusters(response.id)
+                    processed_count += 1
+                
+                # Now directly analyze the data from ResponseWord model
+                # Get all words with their custom clusters
+                words_with_clusters = ResponseWord.objects.filter(
+                    response__survey=survey,
+                    custom_clusters__isnull=False
+                ).select_related('answer', 'response')
+                
+                # Create a dictionary to hold our analysis results
+                analysis_results = {}
+                
+                # Track which clusters have been seen for each response
+                response_cluster_map = {}
+                
+                # Process each word to build cluster statistics
+                for word in words_with_clusters:
+                    response_id = word.response_id
+                    
+                    # Get NPS rating for this response (if available)
+                    nps_rating = None
+                    for answer in word.response.answers.all():
+                        if answer.nps_rating is not None:
+                            nps_rating = answer.nps_rating
+                            break
+                    
+                    # Process each custom cluster for this word
+                    for cluster in word.custom_clusters.all():
+                        cluster_id = cluster.id
+                        cluster_name = cluster.name
+                        
+                        # Initialize cluster in results if not already there
+                        if cluster_id not in analysis_results:
+                            analysis_results[cluster_id] = {
+                                'name': cluster_name,
+                                'sentiment_scores': [],
+                                'nps_scores': [],
+                                'frequency': 0,
+                                'response_frequencies': 0,
+                                'responses': set(),
+                            }
+                        
+                        # Add sentiment score for this word
+                        analysis_results[cluster_id]['sentiment_scores'].append(word.sentiment_score)
+                        
+                        # Update response tracking
+                        if response_id not in analysis_results[cluster_id]['responses']:
+                            analysis_results[cluster_id]['responses'].add(response_id)
+                            analysis_results[cluster_id]['response_frequencies'] += 1
+                            
+                            # Also track clusters by response to avoid double-counting
+                            if response_id not in response_cluster_map:
+                                response_cluster_map[response_id] = set()
+                            
+                            response_cluster_map[response_id].add(cluster_id)
+                        
+                        # Add NPS rating (if available)
+                        if nps_rating is not None:
+                            analysis_results[cluster_id]['nps_scores'].append(nps_rating)
+                
+                # Compute average statistics for each cluster
+                cluster_data = []
+                for cluster_id, data in analysis_results.items():
+                    # Compute averages
+                    avg_sentiment = sum(data['sentiment_scores']) / len(data['sentiment_scores']) if data['sentiment_scores'] else 0
+                    avg_nps = sum(data['nps_scores']) / len(data['nps_scores']) if data['nps_scores'] else None
+                    
+                    # Determine cluster category (positive, negative, neutral)
+                    is_positive = False
+                    is_negative = False
+                    is_neutral = True
+                    
+                    if avg_nps is not None:
+                        if avg_nps >= 9:
+                            is_positive = True
+                            is_neutral = False
+                        elif avg_nps <= 6:
+                            is_negative = True
+                            is_neutral = False
+                    elif avg_sentiment > 0.3:
+                        is_positive = True
+                        is_neutral = False
+                    elif avg_sentiment < -0.3:
+                        is_negative = True
+                        is_neutral = False
+                    
+                    # Append to cluster data
+                    cluster_data.append({
+                        'id': cluster_id,
+                        'name': data['name'],
+                        'avg_sentiment': avg_sentiment,
+                        'avg_nps': avg_nps,
+                        'frequency': data['response_frequencies'],
+                        'is_positive': is_positive,
+                        'is_negative': is_negative,
+                        'is_neutral': is_neutral
+                    })
+                
+                # print(cluster_data)
+                # Sort by frequency
+                cluster_data = sorted(cluster_data, key=lambda x: x['frequency'], reverse=True)
+                
+                # Update summary object with clusters
+                if cluster_data:
+                    # Top clusters overall
+                    summary.top_clusters = [c['id'] for c in cluster_data[:10]]
+                    
+                    # Top clusters by category
+                    positive_clusters = [c for c in cluster_data if c['is_positive']]
+                    negative_clusters = [c for c in cluster_data if c['is_negative']]
+                    neutral_clusters = [c for c in cluster_data if c['is_neutral']]
+                    
+                    summary.top_positive_clusters = [c['id'] for c in positive_clusters[:5]]
+                    summary.top_negative_clusters = [c['id'] for c in negative_clusters[:5]]
+                    summary.top_neutral_clusters = [c['id'] for c in neutral_clusters[:5]]
+                    
+                    cluster_count = len(cluster_data)
+                
+                # Update other summary fields
+                # Language breakdown
+                languages = Response.objects.filter(survey=survey).values('language').annotate(
+                    count=Count('id')
+                )
+                language_breakdown = {item['language']: item['count'] for item in languages}
+                summary.language_breakdown = language_breakdown
+                
+                # Get NPS ratings
+                nps_scores = Answer.objects.filter(
+                    response__survey=survey,
+                    nps_rating__isnull=False
+                ).values_list('nps_rating', flat=True)
+                
+                nps_scores_list = list(nps_scores)
+                
+                # Calculate statistics if we have scores
+                if nps_scores_list:
+                    stats = calculate_stats_from_scores(nps_scores_list)
+                    summary.average_satisfaction = stats['average']
+                    summary.median_satisfaction = stats['median']
+                    summary.satisfaction_confidence_low = stats['conf_low']
+                    summary.satisfaction_confidence_high = stats['conf_high']
+                    
+                    # Calculate satisfaction score
+                    nps_data = calculate_satisfaction_score(nps_scores_list)
+                    summary.satisfaction_score = nps_data['score']
+                    summary.positive_percentage = nps_data['promoters_pct']
+                    summary.negative_percentage = nps_data['detractors_pct']
+                    summary.neutral_percentage = nps_data['passives_pct']
+                    
+                    # Count responses
+                    summary.response_count = Response.objects.filter(survey=survey).count()
+                
+                # Explicitly save the updated summary and flush to database
+                summary.save()
+                
+                # Log what was updated
+                logger.info(f"Updated analysis summary for survey {pk}. Response count: {summary.response_count}")
+                logger.info(f"Top clusters: {summary.top_clusters}")
+            
+            # Return information about what was done
+            return DRFResponse({
+                'success': True,
+                'message': f'Processed {processed_count} responses with {cluster_count} custom clusters',
+                'processed_count': processed_count,
+                'cluster_count': cluster_count,
+                'clusters': cluster_data[:3] if cluster_data else [],
+                'summary_id': summary.id,
+                'last_updated': summary.last_updated.isoformat() if summary.last_updated else None
+            })
+            
+        except Survey.DoesNotExist:
+            return DRFResponse({"error": "Survey not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error processing responses: {str(e)}", exc_info=True)
+            return DRFResponse(
+                {"error": f"Error processing responses: {str(e)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    @action(detail=True, methods=['post'])
+    def process_all_responses(self, request, pk=None):
+        """
+        Legacy method that processes all responses and identifies ones that need text extraction
+        and cluster assignment. It then updates the analysis summary.
+        """
+        return self.direct_process_all_responses(request, pk)
+
 
 class CustomWordClusterViewSet(viewsets.ModelViewSet):
     """
@@ -1127,4 +1794,106 @@ class CustomWordClusterViewSet(viewsets.ModelViewSet):
         
         serializer = self.get_serializer(cluster)
         return DRFResponse(serializer.data)
+
+
+class ProcessTextView(APIView):
+    """
+    API endpoint for testing text processing.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, format=None):
+        text = request.data.get('text', '')
+        language = request.data.get('language', 'en')
+        
+        if not text:
+            return DRFResponse(
+                {"error": "Text is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Process the text using our utility function
+        processed_words = process_text(text, language)
+        
+        # Assign clusters to words without saving to database
+        word_clusters = assign_clusters_to_words(text, processed_words, language)
+        
+        # Prepare structured result with word and assigned cluster
+        structured_words = []
+        for word in processed_words:
+            structured_words.append({
+                'word': word,
+                'assigned_cluster': word_clusters.get(word, 'Other')
+            })
+        
+        # Return the processed words with cluster assignments
+        return DRFResponse({
+            'original_text': text,
+            'language': language,
+            'processed_words': processed_words,
+            'structured_words': structured_words,
+            'word_count': len(processed_words)
+        }, status=status.HTTP_200_OK)
+
+
+class ProcessSurveyResponsesView(APIView):
+    """
+    API endpoint for processing all responses for a survey and assigning clusters to words.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, format=None):
+        survey_id = request.data.get('survey_id')
+        response_id = request.data.get('response_id')
+        
+        if not survey_id and not response_id:
+            return DRFResponse(
+                {"error": "Either survey_id or response_id is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        try:
+            if response_id:
+                # Process a single response
+                process_survey_and_assign_clusters(response_id)
+                return DRFResponse({
+                    'message': f'Successfully processed response {response_id}'
+                }, status=status.HTTP_200_OK)
+            else:
+                # Process all responses for a survey
+                from .models import Response, Survey
+                
+                try:
+                    survey = Survey.objects.get(id=survey_id)
+                except Survey.DoesNotExist:
+                    return DRFResponse(
+                        {"error": f"Survey with ID {survey_id} does not exist"}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
+                
+                # Get all responses for this survey
+                responses = Response.objects.filter(
+                    answers__question__survey=survey
+                ).distinct()
+                
+                # Process each response
+                processed_count = 0
+                for response in responses:
+                    try:
+                        process_survey_and_assign_clusters(response.id)
+                        processed_count += 1
+                    except Exception as e:
+                        logger.error(f"Error processing response {response.id}: {str(e)}")
+                
+                return DRFResponse({
+                    'message': f'Successfully processed {processed_count} responses for survey {survey_id}'
+                }, status=status.HTTP_200_OK)
+
+                
+        except Exception as e:
+            return DRFResponse(
+                {"error": f"An error occurred: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 

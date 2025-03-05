@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster
+from django.db import models
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -179,39 +180,48 @@ class WordClusterSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'survey', 'name', 'description', 'sentiment_score', 
             'frequency', 'is_positive', 'is_negative', 'is_neutral', 
-            'created_at', 'updated_at'
+            'nps_score', 'custom_cluster_id', 'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
 
 
 class CustomWordClusterSerializer(serializers.ModelSerializer):
     created_by_name = serializers.SerializerMethodField()
+    associated_words = serializers.SerializerMethodField()
     
     class Meta:
         model = CustomWordCluster
         fields = [
             'id', 'name', 'description', 'keywords', 'is_active',
-            'created_by', 'created_by_name', 'created_at', 'updated_at'
+            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'word_count', 'last_processed', 'associated_words'
         ]
-        read_only_fields = ['created_at', 'updated_at', 'created_by', 'created_by_name']
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'created_by_name', 
+                          'word_count', 'last_processed', 'associated_words']
         extra_kwargs = {
-            'description': {'required': False, 'write_only': True},
-            'keywords': {'required': False, 'write_only': True},
-            'is_active': {'required': False, 'default': True, 'write_only': True}
+            'description': {'required': False},
+            'keywords': {'required': False, 'default': list},
+            'is_active': {'required': False, 'default': True}
         }
     
     def get_created_by_name(self, obj):
         return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+    
+    def get_associated_words(self, obj):
+        """Return the top 10 associated words for this cluster"""
+        return obj.get_associated_words(limit=10)
 
 
 class ResponseWordSerializer(serializers.ModelSerializer):
     clusters = WordClusterSerializer(many=True, read_only=True)
+    custom_clusters = CustomWordClusterSerializer(many=True, read_only=True)
     
     class Meta:
         model = ResponseWord
         fields = [
             'id', 'response', 'answer', 'word', 'original_text',
-            'frequency', 'sentiment_score', 'clusters', 'language', 'created_at'
+            'frequency', 'sentiment_score', 'clusters', 'custom_clusters', 
+            'assigned_cluster', 'language', 'created_at'
         ]
         read_only_fields = ['created_at']
 
@@ -260,11 +270,83 @@ class SurveyAnalysisSummarySerializer(serializers.ModelSerializer):
     
     def _get_clusters_data(self, cluster_ids):
         # Helper method to fetch cluster data from IDs
+        from .models import WordCluster, CustomWordCluster, ResponseWord
+        
         if not cluster_ids:
             return []
+        
+        # First check if these are CustomWordCluster IDs
+        custom_clusters = list(CustomWordCluster.objects.filter(id__in=cluster_ids))
+        
+        # If CustomWordCluster models are found, use them
+        if custom_clusters:
+            # Convert CustomWordCluster to format expected by frontend
+            cluster_data_list = []
+            for cc in custom_clusters:
+                # Get associated response words
+                response_words = ResponseWord.objects.filter(custom_clusters=cc)
+                
+                # Count distinct responses
+                distinct_responses = response_words.values('response').distinct().count()
+                
+                # Calculate average sentiment
+                avg_sentiment = response_words.aggregate(models.Avg('sentiment_score'))['sentiment_score__avg'] or 0
+                
+                # Count NPS ratings
+                from .models import Answer
+                nps_answers = Answer.objects.filter(
+                    response__in=response_words.values('response'),
+                    nps_rating__isnull=False
+                )
+                
+                # Calculate average NPS
+                avg_nps = None
+                if nps_answers.exists():
+                    avg_nps = nps_answers.aggregate(models.Avg('nps_rating'))['nps_rating__avg']
+                
+                # Create a dict representing cluster data
+                cluster_data = {
+                    'id': cc.id,
+                    'name': cc.name,
+                    'survey': cc.id,  # Set to cluster ID for consistency
+                    'description': cc.description or "",
+                    'frequency': distinct_responses,
+                    'sentiment_score': avg_sentiment,
+                    'nps_score': avg_nps,
+                    'is_positive': False,
+                    'is_negative': False,
+                    'is_neutral': True,
+                    'custom_cluster_id': cc.id,
+                    'created_at': cc.created_at.isoformat() if cc.created_at else None,
+                    'updated_at': cc.updated_at.isoformat() if cc.updated_at else None
+                }
+                
+                # Determine sentiment category
+                if avg_nps is not None:
+                    if avg_nps >= 9:
+                        cluster_data['is_positive'] = True
+                        cluster_data['is_neutral'] = False
+                    elif avg_nps <= 6:
+                        cluster_data['is_negative'] = True
+                        cluster_data['is_neutral'] = False
+                elif avg_sentiment > 0.3:
+                    cluster_data['is_positive'] = True
+                    cluster_data['is_neutral'] = False
+                elif avg_sentiment < -0.3:
+                    cluster_data['is_negative'] = True
+                    cluster_data['is_neutral'] = False
+                
+                cluster_data_list.append(cluster_data)
             
-        clusters = WordCluster.objects.filter(id__in=cluster_ids)
-        return WordClusterSerializer(clusters, many=True).data
+            return sorted(cluster_data_list, key=lambda x: x.get('frequency', 0), reverse=True)
+            
+        # If no CustomWordCluster models are found, fall back to WordCluster
+        clusters = list(WordCluster.objects.filter(id__in=cluster_ids))
+        if clusters:
+            return WordClusterSerializer(clusters, many=True).data
+            
+        # If neither is found, return empty list
+        return []
 
 
 class SurveyDetailSerializer(SurveySerializer):

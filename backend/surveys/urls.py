@@ -2,7 +2,8 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     SurveyViewSet, QuestionViewSet, ResponseViewSet, 
-    DashboardViewSet, SurveyAnalysisViewSet, CustomWordClusterViewSet
+    DashboardViewSet, SurveyAnalysisViewSet, CustomWordClusterViewSet,
+    ProcessTextView, ProcessSurveyResponsesView
 )
 
 router = DefaultRouter()
@@ -15,5 +16,7 @@ router.register(r'custom-clusters', CustomWordClusterViewSet, basename='custom-c
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('process-text/', ProcessTextView.as_view(), name='process-text'),
+    path('process-survey-responses/', ProcessSurveyResponsesView.as_view(), name='process-survey-responses'),
 ]
 

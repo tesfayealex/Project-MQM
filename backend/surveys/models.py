@@ -1,7 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.postgres.fields import ArrayField
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 import json
+from django.utils import timezone
 
 
 class Survey(models.Model):
@@ -178,9 +181,52 @@ class Answer(models.Model):
     text_answer = models.TextField(null=True, blank=True)
     sentiment_score = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    processed = models.BooleanField(default=False, help_text="Whether this answer has been processed for word extraction")
 
     def __str__(self):
         return f"Answer to {self.question} ({self.created_at})"
+    
+    def process_text_answer(self):
+        """Process the text answer to extract words and associate them with clusters."""
+        from .utils import process_text
+        
+        if not self.text_answer or self.processed:
+            return
+        
+        # Get the language from the response
+        language = self.response.language
+        
+        # Process the text to extract words
+        processed_words = process_text(self.text_answer, language)
+        
+        if processed_words:
+            # Create ResponseWord instances for each processed word
+            for word in processed_words:
+                # Create the ResponseWord instance
+                response_word = ResponseWord.objects.create(
+                    response=self.response,
+                    answer=self,
+                    word=word,
+                    original_text=self.text_answer,
+                    language=language
+                )
+                
+                # Associate with custom clusters if applicable
+                active_clusters = CustomWordCluster.objects.filter(is_active=True)
+                for cluster in active_clusters:
+                    if cluster.matches_word(word):
+                        response_word.custom_clusters.add(cluster)
+                        
+                        # Update the last_processed timestamp for the cluster
+                        cluster.last_processed = timezone.now()
+                        cluster.save(update_fields=['last_processed'])
+                        
+                        # Update the word count asynchronously
+                        cluster.update_word_count()
+        
+        # Mark as processed
+        self.processed = True
+        self.save(update_fields=['processed'])
 
 
 class WordCluster(models.Model):
@@ -188,22 +234,94 @@ class WordCluster(models.Model):
     Represents a cluster of related words identified in survey responses.
     Used for text analytics and sentiment analysis visualization.
     """
-    survey = models.ForeignKey(Survey, related_name='word_clusters', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100, help_text="Name of the cluster (e.g., 'Customer Service')")
-    description = models.TextField(blank=True, help_text="Description of what this cluster represents")
-    sentiment_score = models.FloatField(default=0.0, help_text="Average sentiment score for this cluster (-1 to 1)")
-    frequency = models.IntegerField(default=0, help_text="Number of times this cluster appears in responses")
-    is_positive = models.BooleanField(default=False, help_text="Whether this is classified as a positive cluster")
-    is_negative = models.BooleanField(default=False, help_text="Whether this is classified as a negative cluster")
-    is_neutral = models.BooleanField(default=True, help_text="Whether this is classified as a neutral cluster")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    sentiment_score = models.FloatField(default=0)
+    frequency = models.IntegerField(default=0)
+    survey = models.ForeignKey('Survey', on_delete=models.CASCADE, related_name='word_clusters')
+    is_positive = models.BooleanField(default=False)
+    is_negative = models.BooleanField(default=False)
+    is_neutral = models.BooleanField(default=True)
+    category = models.CharField(max_length=50, default='neutral', choices=(
+        ('positive', 'Positive'),
+        ('negative', 'Negative'),
+        ('neutral', 'Neutral'),
+    ))
+    nps_score = models.FloatField(null=True, blank=True, help_text="Average NPS score associated with this cluster")
+    custom_cluster_id = models.IntegerField(null=True, blank=True, help_text="ID of the custom cluster this was derived from, if any")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
+    def __str__(self):
+        return self.name
+    
     class Meta:
         ordering = ['-frequency']
 
+
+class CustomWordCluster(models.Model):
+    """
+    Represents a user-defined cluster of related words or phrases for analysis.
+    These clusters can be applied across all surveys for consistent analysis.
+    """
+    name = models.CharField(max_length=100, help_text="Name of the custom cluster (e.g., 'Customer Service')")
+    description = models.TextField(blank=True, help_text="Description of what this cluster represents")
+    keywords = models.JSONField(default=list, help_text="List of keywords/phrases that belong to this cluster")
+    is_active = models.BooleanField(default=True, help_text="Whether this cluster is currently active")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_clusters')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    word_count = models.IntegerField(default=0, help_text="Number of words associated with this cluster")
+    last_processed = models.DateTimeField(null=True, blank=True, help_text="When this cluster was last processed")
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Custom Word Cluster"
+        verbose_name_plural = "Custom Word Clusters"
+
     def __str__(self):
-        return f"{self.name} (Sentiment: {self.sentiment_score:.2f}, Freq: {self.frequency})"
+        return f"{self.name} ({len(self.keywords)} keywords)"
+    
+    def matches_word(self, word):
+        """Check if a word matches any of the keywords in this cluster."""
+        if not word:
+            return False
+            
+        # Convert word to lowercase for case-insensitive matching
+        word = word.lower()
+        
+        # Check if word matches any of the keywords
+        for keyword in self.keywords:
+            if keyword.lower() in word or word in keyword.lower():
+                return True
+        
+        return False
+    
+    def update_word_count(self):
+        """Update the count of words associated with this cluster."""
+        from django.db.models import Count
+        
+        # Count associated ResponseWord objects
+        count = ResponseWord.objects.filter(
+            custom_clusters__id=self.id
+        ).values('word').distinct().count()
+        
+        self.word_count = count
+        self.save(update_fields=['word_count'])
+        
+    def get_associated_words(self, limit=100):
+        """Get the most common words associated with this cluster."""
+        from django.db.models import Count
+        
+        # Get the most frequent words
+        words = ResponseWord.objects.filter(
+            custom_clusters__id=self.id
+        ).values('word').annotate(
+            count=Count('word')
+        ).order_by('-count')[:limit]
+        
+        return list(words)
 
 
 class ResponseWord(models.Model):
@@ -219,6 +337,8 @@ class ResponseWord(models.Model):
     frequency = models.IntegerField(default=1, help_text="Frequency of this word in the response")
     sentiment_score = models.FloatField(default=0.0, help_text="Sentiment score for this word (-1 to 1)")
     clusters = models.ManyToManyField(WordCluster, related_name='words', blank=True)
+    custom_clusters = models.ManyToManyField(CustomWordCluster, related_name='words', blank=True)
+    assigned_cluster = models.CharField(max_length=100, null=True, blank=True, help_text="Directly assigned cluster name for this word")
     language = models.CharField(max_length=2, choices=Survey.LANGUAGE_CHOICES, default='en')
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -270,24 +390,11 @@ class SurveyAnalysisSummary(models.Model):
         return f"Analysis Summary for {self.survey.title} ({self.last_updated})"
 
 
-class CustomWordCluster(models.Model):
-    """
-    Represents a user-defined cluster of related words or phrases for analysis.
-    These clusters can be applied across all surveys for consistent analysis.
-    """
-    name = models.CharField(max_length=100, help_text="Name of the custom cluster (e.g., 'Customer Service')")
-    description = models.TextField(blank=True, help_text="Description of what this cluster represents")
-    keywords = models.JSONField(default=list, help_text="List of keywords/phrases that belong to this cluster")
-    is_active = models.BooleanField(default=True, help_text="Whether this cluster is currently active")
-    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_clusters')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['name']
-        verbose_name = "Custom Word Cluster"
-        verbose_name_plural = "Custom Word Clusters"
-
-    def __str__(self):
-        return f"{self.name} ({len(self.keywords)} keywords)"
+# Create a signal handler to process text answers
+@receiver(post_save, sender=Answer)
+def process_answer_text(sender, instance, created, **kwargs):
+    """Process text answer when an Answer is created or updated."""
+    # Only process if there's a text_answer and it hasn't been processed yet
+    if instance.text_answer and not instance.processed:
+        instance.process_text_answer()
 

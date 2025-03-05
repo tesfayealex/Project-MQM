@@ -1,5 +1,6 @@
 export interface WordCluster {
     id: number;
+    survey: number;
     name: string;
     description: string;
     sentiment_score: number;
@@ -7,8 +8,23 @@ export interface WordCluster {
     is_positive: boolean;
     is_negative: boolean;
     is_neutral: boolean;
+    nps_score: number | null;
+    custom_cluster_id: number | null;
     created_at: string;
     updated_at: string;
+    /**
+     * Indicates how the cluster is categorized.
+     * Clusters are categorized based on NPS scores from associated responses:
+     * - Positive: Associated with responses having NPS >= 9 (Promoters)
+     * - Negative: Associated with responses having NPS <= 6 (Detractors)
+     * - Neutral: Associated with responses having NPS 7-8 (Passives)
+     * 
+     * If no NPS score is available, categorization is based on sentiment score:
+     * - Positive: sentiment > 0.3
+     * - Negative: sentiment < -0.3
+     * - Neutral: -0.3 <= sentiment <= 0.3
+     */
+    category?: string;
 }
 
 export interface ResponseWord {
@@ -52,4 +68,7 @@ export interface WordCloudItem {
     text: string;
     value: number;
     sentiment: number;
+    is_positive?: boolean;
+    is_negative?: boolean;
+    is_neutral?: boolean;
 } 

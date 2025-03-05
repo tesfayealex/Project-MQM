@@ -5,6 +5,7 @@ interface SentimentChartProps {
     positive: number;
     negative: number;
     neutral: number;
+    improved?: boolean;
 }
 
 const COLORS = ['#4CAF50', '#F44336', '#9E9E9E'];

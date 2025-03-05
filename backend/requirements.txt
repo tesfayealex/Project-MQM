@@ -7,3 +7,4 @@ python-dotenv==1.0.1
 numpy==2.2.3
 nltk==3.9.1
 scikit-learn==1.6.1 
+openai==1.65.3

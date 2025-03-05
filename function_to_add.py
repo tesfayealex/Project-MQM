@@ -1,63 +1,54 @@
-import nltk
-from nltk.stem.snowball import SnowballStemmer
-from nltk.corpus import stopwords
-import spacy
+from openai import OpenAI
+from google.colab import userdata
+import os
 
-nlp = spacy.load('de_core_news_md') 
+os.environ["OPENAI_API_KEY"] = userdata.get('OPENAI_API_KEY')
 
-import nltk
-nltk.download('punkt')
-nltk.download('averaged_perceptron_tagger')
-nltk.download('punkt_tab')
-nltk.download('stopwords')
+client = OpenAI()  # Initialize the OpenAI client
 
-!python -m spacy download de_core_news_md
-
-def process_text(text):
+def process_survey_data(survey_name, survey_question, survey_answer, list_of_words):
     """
-    Processes input text and returns a single processed word.
+    Processes survey data using the OpenAI API.
 
     Args:
-        text: The input text string.
+        survey_name (str): The name of the survey.
+        survey_question (str): The survey question.
+        survey_answer (str): The answer to the survey question.
+        list_of_words (list): A list of words.
 
     Returns:
-        A single processed word (string) from the text, or None if no suitable word is found.
+        str: The response from the OpenAI API.
     """
 
-    # 1. Get words_combined
-    sentences = nltk.sent_tokenize(text, language='german')
-    words_combined = []
-    for sentence in sentences:
-        words = nltk.word_tokenize(sentence, language='german')
-        words_combined.extend(words)
+    # get cluster list from cluster model
+    cluster = ["Reception", "Customer & Client", "Location & Arrival", "Air", "Furniture", "Staff", "Technical Equipment", "Temperature", "Event", "Speech & Presentation"]
 
-    # print(f"Words: {words_combined}")
-    # 2. Get consolidated_words
-    
-    doc = nlp(" ".join(words_combined))
-    # print(doc)
 
-    # Print each token's text and lemma
-    # for token in doc:
-        # print(token.text, "->", token.lemma_)
-    consolidated_words = [word.lemma_ for word in doc if len(word.lemma_) > 1]
-    # print(consolidated_words)
+    with open('survey_extract_prompt.txt', 'r') as file:
+        system_prompt = file.read()
 
-    # 3. Get cleaned_words
-    german_stopwords = set(stopwords.words('german'))
-    cleaned_words = [
-        word.lower() for word in consolidated_words
-        if word.isalpha() and word.lower() not in german_stopwords
-    ]
+    user_message = f"Survey Name: {survey_name}\n" \
+                   f"Survey Question: {survey_question}\n" \
+                   f"Survey Answer: {survey_answer}\n" \
+                   f"List of Words: {list_of_words}"
 
-    # 4. Get pos_filtered
-    # nlp = spacy.load('de_core_news_md')  # Make sure you have this model downloaded
-    doc = nlp(" ".join(cleaned_words))
-    # pos_filtered = [token.text for token in doc if token.pos_ in ['NOUN', 'ADJ']]
-    pos_filtered = [token.text for token in doc if token.tag_ in ['ADJD'] or token.pos_ in ['NOUN', 'ADJ']]
+    completion = client.chat.completions.create(
+        model="gpt-4o",  # Or another suitable model
+        messages=[
+            {"role": "system", "content": system_prompt.replace("change_cluster", str(cluster))},
+            {"role": "user", "content": user_message}
+        ],
+        response_format={ "type": "json_object" }
+    )
 
-    # Return the first word from pos_filtered (or None if empty)
-    return pos_filtered
+    return completion.choices[0].message.content  # Extract the response content
 
-result_word = process_text(text)
-# print(result_word)  # Output: veranstaltung
+# Example usage:
+survey_name = "Employee Satisfaction Survey"
+survey_question = "What are your suggestions for improvement?"
+survey_answer = "Better communication and more team-building activities."
+list_of_words = ["communication", "teamwork", "collaboration"]
+
+result = process_survey_data(survey_name, survey_question, survey_answer, list_of_words)
+
+print(result)  # Output: (The response from the OpenAI API)

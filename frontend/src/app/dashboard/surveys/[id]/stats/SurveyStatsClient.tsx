@@ -6,7 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { getSurvey, getSurveyStats, getSurveyResponses } from '@/lib/services/survey-service';
+import { Loader2, BarChart2, ArrowDownIcon, ArrowUpIcon, ListFilter, CheckIcon, EditIcon } from 'lucide-react';
+import { getSurvey, getSurveyStats, getSurveyResponses, getSurveyResponseWords, updateWordCluster } from '@/lib/services/survey-service';
+import { processSurveyResponses } from '@/lib/services/cluster-service';
+import { getActiveClusters } from '@/lib/services/cluster-service';
 import { Survey, SurveyStats } from '@/types/survey';
 import { useToast } from '@/components/ui/use-toast';
 import { handleAuthError } from '@/lib/auth-utils';
@@ -27,6 +30,14 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from 'date-fns';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 
 interface Response {
   id: string;
@@ -64,6 +75,13 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
   const [responses, setResponses] = useState<Response[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [processing, setProcessing] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "enhanced">("table");
+  const [extractedWordsMap, setExtractedWordsMap] = useState<Record<string, any[]>>({});
+  const [loadingExtractedWords, setLoadingExtractedWords] = useState<Record<string, boolean>>({});
+  const [availableClusters, setAvailableClusters] = useState<string[]>([]);
+  const [editingWordId, setEditingWordId] = useState<number | null>(null);
+  const [updatingCluster, setUpdatingCluster] = useState(false);
   
   useEffect(() => {
     async function fetchSurveyAndStats() {
@@ -142,6 +160,113 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
     
     fetchSurveyAndStats();
   }, [surveyId, toast]);
+
+  // Load available clusters for dropdown
+  useEffect(() => {
+    async function loadAvailableClusters() {
+      try {
+        const clusters = await getActiveClusters();
+        setAvailableClusters(clusters.map(cluster => cluster.name));
+      } catch (error) {
+        console.error("Error loading clusters:", error);
+      }
+    }
+    
+    loadAvailableClusters();
+  }, []);
+
+  // Function to handle cluster update
+  const handleUpdateCluster = async (wordId: number, clusterId: number, wordIndex: number, responseId: string, newCluster: string) => {
+    try {
+      setUpdatingCluster(true);
+      setEditingWordId(wordId);
+      
+      await updateWordCluster(wordId, newCluster);
+      
+      // Update local state
+      setExtractedWordsMap(prev => {
+        const words = [...prev[responseId]];
+        words[wordIndex] = {
+          ...words[wordIndex],
+          assigned_cluster: newCluster
+        };
+        return { ...prev, [responseId]: words };
+      });
+      
+      toast({
+        title: "Cluster updated",
+        description: "The word has been assigned to a new cluster.",
+      });
+    } catch (error) {
+      console.error("Error updating cluster:", error);
+      toast({
+        title: "Error updating cluster",
+        description: "There was a problem updating the cluster.",
+        variant: "destructive"
+      });
+    } finally {
+      setUpdatingCluster(false);
+      setEditingWordId(null);
+    }
+  };
+
+  // Add a function to handle processing all responses
+  async function handleProcessAllResponses() {
+    if (!surveyId) return;
+
+    try {
+      setProcessing(true);
+      const result = await processSurveyResponses(surveyId);
+      toast({
+        title: "Processing Complete",
+        description: result.message || `Processed survey responses successfully.`,
+      });
+      // Refresh the responses after processing
+      if (surveyId) {
+        const newResponses = await getSurveyResponses(surveyId);
+        setResponses(newResponses);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Processing Failed",
+        description: error.message || "Failed to process survey responses",
+        variant: "destructive"
+      });
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  // Helper function to load extracted words for a response
+  const loadExtractedWords = async (responseId: string) => {
+    try {
+      if (extractedWordsMap[responseId] || loadingExtractedWords[responseId]) {
+        return; // Already loaded or loading
+      }
+      
+      setLoadingExtractedWords(prev => ({ ...prev, [responseId]: true }));
+      
+      const words = await getSurveyResponseWords(responseId);
+      
+      setExtractedWordsMap(prev => ({
+        ...prev,
+        [responseId]: words
+      }));
+      
+      setLoadingExtractedWords(prev => ({ ...prev, [responseId]: false }));
+    } catch (error) {
+      console.error(`Error loading extracted words for response ${responseId}:`, error);
+      setLoadingExtractedWords(prev => ({ ...prev, [responseId]: false }));
+    }
+  };
+
+  // Load extracted words when expanded
+  const handleAccordionValueChange = (value: string) => {
+    if (value && viewMode === "enhanced") {
+      const responseId = value.replace('item-', '');
+      loadExtractedWords(responseId);
+    }
+  };
 
   if (loading) {
     return (
@@ -339,21 +464,143 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
         </TabsContent>
 
         <TabsContent value="responses">
+          <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center space-x-4">
+              <h2 className="text-xl font-bold">All Responses ({responses.length})</h2>
+              <div className="flex items-center border rounded-md overflow-hidden">
+                <Button
+                  variant={viewMode === "table" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-8"
+                  onClick={() => setViewMode("table")}
+                >
+                  Table View
+                </Button>
+                <Button
+                  variant={viewMode === "enhanced" ? "default" : "ghost"}
+                  size="sm"
+                  className="rounded-none h-8"
+                  onClick={() => setViewMode("enhanced")}
+                >
+                  Enhanced View
+                </Button>
+              </div>
+            </div>
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto h-8 lg:flex"
+                  onClick={handleProcessAllResponses}
+                  disabled={processing || !surveyId}
+                >
+                  {processing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <BarChart2 className="mr-2 h-4 w-4" />
+                      Process All Responses
+                    </>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Process all responses to assign words to clusters</p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+          
           {responses.length === 0 ? (
             <Card>
               <CardContent className="pt-6">
                 <p className="text-center text-muted-foreground">No responses yet for this survey.</p>
               </CardContent>
             </Card>
+          ) : viewMode === "table" ? (
+            // Table View
+            <Card>
+              <CardContent className="pt-6 p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>#</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Language</TableHead>
+                      {/* Dynamically generate columns based on first response's questions */}
+                      {responses[0]?.answers?.map((answer: any) => {
+                        const questionText = 
+                          answer.question?.questions?.[responses[0].language] || 
+                          answer.question?.questions?.en || 
+                          (answer.question?.questions && Object.values(answer.question?.questions)[0]) || 
+                          `Question ${answer.question?.order || ''}`;
+                        
+                        return (
+                          <TableHead key={answer.question?.id}>
+                            {answer.question?.type === 'nps' ? `NPS: ${questionText}` : questionText}
+                          </TableHead>
+                        );
+                      })}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {responses.map((response, index) => (
+                      <TableRow key={response.id}>
+                        <TableCell>{index + 1}</TableCell>
+                        <TableCell>{format(new Date(response.created_at), 'MMM d, yyyy HH:mm')}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{response.language.toUpperCase()}</Badge>
+                        </TableCell>
+                        {/* Map each answer to its column, maintaining the order */}
+                        {responses[0]?.answers?.map((firstAnswer: any) => {
+                          const matchingAnswer = response.answers?.find(
+                            (a: any) => a.question?.id === firstAnswer.question?.id
+                          );
+                          
+                          if (!matchingAnswer) {
+                            return <TableCell key={`empty-${firstAnswer.question?.id}`}>-</TableCell>;
+                          }
+                          
+                          return (
+                            <TableCell key={matchingAnswer.id}>
+                              {matchingAnswer.question?.type === 'nps' ? (
+                                <div className="flex items-center space-x-2">
+                                  <span className={`text-lg font-bold ${
+                                    matchingAnswer.nps_rating !== undefined ? (
+                                      matchingAnswer.nps_rating >= 9 ? "text-green-500" : 
+                                      matchingAnswer.nps_rating >= 7 ? "text-yellow-500" : 
+                                      "text-red-500"
+                                    ) : ""
+                                  }`}>
+                                    {matchingAnswer.nps_rating !== undefined ? matchingAnswer.nps_rating : '-'}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div>
+                                  {matchingAnswer.text_answer || <span className="text-muted-foreground">-</span>}
+                                </div>
+                              )}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           ) : (
-            <Accordion type="single" collapsible className="space-y-4">
+            // Enhanced View (Original Accordion)
+            <Accordion 
+              type="single" 
+              collapsible 
+              className="space-y-4"
+              onValueChange={handleAccordionValueChange}
+            >
               {responses.map((response, index) => {
-                // Log the full response for debugging
-                if (index === 0) {
-                  console.log(`Response ${index} (${response.id}):`, response);
-                  console.log(`Response ${index} answers:`, response.answers);
-                }
-                
                 // Safely access answers and handle empty arrays
                 const hasAnswers = response.answers && Array.isArray(response.answers) && response.answers.length > 0;
                 
@@ -382,75 +629,165 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pt-2">
                       {sortedAnswers.length > 0 ? (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Question</TableHead>
-                              <TableHead>Answer</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {sortedAnswers.map((answer) => (
-                              <TableRow key={answer.id}>
-                                <TableCell className="align-top">
-                                  {answer.question?.questions ? 
-                                    (answer.question.questions[response.language] || 
-                                     answer.question.questions.en || 
-                                     Object.values(answer.question.questions)[0] || 
-                                     'Untitled Question') : 'Question data unavailable'}
-                                </TableCell>
-                                <TableCell>
-                                  {(() => {
-                                    // Debug logs outside JSX
-                                    if (answer.question?.type === 'nps') {
-                                      console.log(`NPS Rating for answer ${answer.id}:`, answer.nps_rating);
-                                    } else {
-                                      console.log(`Text answer for ${answer.id}:`, answer.text_answer, typeof answer.text_answer);
-                                    }
-                                    
-                                    return answer.question?.type === 'nps' ? (
-                                      <div className="flex items-center space-x-2">
-                                        <span className="text-lg font-bold">{answer.nps_rating !== undefined ? answer.nps_rating : 'No rating'}</span>
-                                        {answer.nps_rating !== undefined && (
-                                          <Badge 
-                                            className={
-                                              answer.nps_rating >= 9 ? "bg-green-500" : 
-                                              answer.nps_rating >= 7 ? "bg-yellow-500" : 
-                                              "bg-red-500"
-                                            }
-                                          >
-                                            {answer.nps_rating >= 9 ? "Promoter" : 
-                                             answer.nps_rating >= 7 ? "Passive" : 
-                                             "Detractor"}
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <div>
-                                        {answer.text_answer !== undefined ? answer.text_answer : <span className="text-muted-foreground">No answer</span>}
-                                        {answer.sentiment_score !== undefined && (
-                                          <div className="mt-1">
-                                            <Badge variant="outline" className={
-                                              answer.sentiment_score > 0.3 ? "text-green-500 border-green-200" :
-                                              answer.sentiment_score < -0.3 ? "text-red-500 border-red-200" :
-                                              "text-yellow-500 border-yellow-200"
-                                            }>
-                                              Sentiment: {
-                                                answer.sentiment_score > 0.3 ? "Positive" :
-                                                answer.sentiment_score < -0.3 ? "Negative" :
-                                                "Neutral"
-                                              }
-                                            </Badge>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })()}
-                                </TableCell>
+                        <div className="space-y-4">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Question</TableHead>
+                                <TableHead>Answer</TableHead>
                               </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {sortedAnswers.map((answer) => (
+                                <TableRow key={answer.id}>
+                                  <TableCell className="align-top">
+                                    {answer.question?.questions ? 
+                                      (answer.question.questions[response.language] || 
+                                       answer.question.questions.en || 
+                                       Object.values(answer.question.questions)[0] || 
+                                       'Untitled Question') : 'Question data unavailable'}
+                                  </TableCell>
+                                  <TableCell>
+                                    {(() => {
+                                      return answer.question?.type === 'nps' ? (
+                                        <div className="flex items-center space-x-2">
+                                          <span className="text-lg font-bold">{answer.nps_rating !== undefined ? answer.nps_rating : 'No rating'}</span>
+                                          {answer.nps_rating !== undefined && (
+                                            <Badge 
+                                              className={
+                                                answer.nps_rating >= 9 ? "bg-green-500" : 
+                                                answer.nps_rating >= 7 ? "bg-yellow-500" : 
+                                                "bg-red-500"
+                                              }
+                                            >
+                                              {answer.nps_rating >= 9 ? "Promoter" : 
+                                               answer.nps_rating >= 7 ? "Passive" : 
+                                               "Detractor"}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div>
+                                          {answer.text_answer !== undefined ? answer.text_answer : <span className="text-muted-foreground">No answer</span>}
+                                          {answer.sentiment_score !== undefined && (
+                                            <div className="mt-1">
+                                              <Badge variant="outline" className={
+                                                answer.sentiment_score > 0.3 ? "text-green-500 border-green-200" :
+                                                answer.sentiment_score < -0.3 ? "text-red-500 border-red-200" :
+                                                "text-yellow-500 border-yellow-200"
+                                              }>
+                                                Sentiment: {
+                                                  answer.sentiment_score > 0.3 ? "Positive" :
+                                                  answer.sentiment_score < -0.3 ? "Negative" :
+                                                  "Neutral"
+                                                }
+                                              </Badge>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                          
+                          {/* Extracted Words Section */}
+                          <div className="mt-4">
+                            <h3 className="text-lg font-semibold mb-2">Extracted Words</h3>
+                            {loadingExtractedWords[response.id] ? (
+                              <div className="flex items-center justify-center p-4">
+                                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                                <span>Loading extracted words...</span>
+                              </div>
+                            ) : extractedWordsMap[response.id]?.length ? (
+                              <div className="border rounded-md p-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+                                  {extractedWordsMap[response.id].map((word, wordIndex) => (
+                                    <div key={word.id} className="flex items-center justify-between p-2 border rounded-md hover:bg-gray-50">
+                                      <span className="font-medium">{word.word}</span>
+                                      
+                                      <Popover open={editingWordId === word.id}>
+                                        <PopoverTrigger asChild>
+                                          <div className="flex items-center">
+                                            {word.assigned_cluster ? (
+                                              <Badge 
+                                                variant="outline" 
+                                                className="ml-2 cursor-pointer hover:bg-gray-100 flex items-center"
+                                                onClick={() => setEditingWordId(word.id)}
+                                              >
+                                                {word.assigned_cluster}
+                                                <EditIcon className="h-3 w-3 ml-1" />
+                                              </Badge>
+                                            ) : (
+                                              <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                onClick={() => setEditingWordId(word.id)}
+                                                className="h-6 px-2"
+                                              >
+                                                <span className="text-xs">Assign Cluster</span>
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="p-0 w-60" align="end">
+                                          <Command>
+                                            <CommandInput placeholder="Search for a cluster..." />
+                                            <CommandList>
+                                              <CommandEmpty>No clusters found.</CommandEmpty>
+                                              <CommandGroup>
+                                                {availableClusters.map(cluster => (
+                                                  <CommandItem
+                                                    key={cluster}
+                                                    onSelect={() => {
+                                                      handleUpdateCluster(word.id, word.id, wordIndex, response.id, cluster);
+                                                    }}
+                                                    className="cursor-pointer"
+                                                  >
+                                                    <span>{cluster}</span>
+                                                    {word.assigned_cluster === cluster && (
+                                                      <CheckIcon className="h-4 w-4 ml-auto" />
+                                                    )}
+                                                  </CommandItem>
+                                                ))}
+                                                {/* Option to create a new cluster */}
+                                                <CommandItem
+                                                  className="border-t cursor-pointer"
+                                                  onSelect={() => {
+                                                    const newCluster = prompt("Enter a name for the new cluster:");
+                                                    if (newCluster) {
+                                                      handleUpdateCluster(word.id, word.id, wordIndex, response.id, newCluster);
+                                                    }
+                                                  }}
+                                                >
+                                                  <span className="font-medium text-blue-600">+ Create new cluster</span>
+                                                </CommandItem>
+                                              </CommandGroup>
+                                            </CommandList>
+                                          </Command>
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center p-4 text-muted-foreground">
+                                <p>No extracted words available</p>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="mt-2"
+                                  onClick={() => loadExtractedWords(response.id)}
+                                >
+                                  Load Words
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       ) : (
                         <div className="py-4 text-center text-muted-foreground">
                           <p className="mb-2">No answers in this response</p>
