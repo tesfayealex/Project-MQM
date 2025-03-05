@@ -180,5 +180,114 @@ class Answer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Answer to {self.question.questions.get(self.question.language, 'Untitled Question')[:50]}"
+        return f"Answer to {self.question} ({self.created_at})"
+
+
+class WordCluster(models.Model):
+    """
+    Represents a cluster of related words identified in survey responses.
+    Used for text analytics and sentiment analysis visualization.
+    """
+    survey = models.ForeignKey(Survey, related_name='word_clusters', on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, help_text="Name of the cluster (e.g., 'Customer Service')")
+    description = models.TextField(blank=True, help_text="Description of what this cluster represents")
+    sentiment_score = models.FloatField(default=0.0, help_text="Average sentiment score for this cluster (-1 to 1)")
+    frequency = models.IntegerField(default=0, help_text="Number of times this cluster appears in responses")
+    is_positive = models.BooleanField(default=False, help_text="Whether this is classified as a positive cluster")
+    is_negative = models.BooleanField(default=False, help_text="Whether this is classified as a negative cluster")
+    is_neutral = models.BooleanField(default=True, help_text="Whether this is classified as a neutral cluster")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-frequency']
+
+    def __str__(self):
+        return f"{self.name} (Sentiment: {self.sentiment_score:.2f}, Freq: {self.frequency})"
+
+
+class ResponseWord(models.Model):
+    """
+    Stores individual words or short phrases extracted from text responses,
+    along with their sentiment scores and cluster associations.
+    Used for word cloud generation and text analytics.
+    """
+    response = models.ForeignKey(Response, related_name='extracted_words', on_delete=models.CASCADE)
+    answer = models.ForeignKey(Answer, related_name='extracted_words', on_delete=models.CASCADE)
+    word = models.CharField(max_length=100, help_text="The extracted word or short phrase")
+    original_text = models.TextField(help_text="The original text context where this word appeared")
+    frequency = models.IntegerField(default=1, help_text="Frequency of this word in the response")
+    sentiment_score = models.FloatField(default=0.0, help_text="Sentiment score for this word (-1 to 1)")
+    clusters = models.ManyToManyField(WordCluster, related_name='words', blank=True)
+    language = models.CharField(max_length=2, choices=Survey.LANGUAGE_CHOICES, default='en')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-frequency', '-sentiment_score']
+        indexes = [
+            models.Index(fields=['word']),
+            models.Index(fields=['sentiment_score']),
+        ]
+
+    def __str__(self):
+        return f"{self.word} (Sentiment: {self.sentiment_score:.2f})"
+
+
+class SurveyAnalysisSummary(models.Model):
+    """
+    Stores pre-calculated analysis summary data for each survey
+    to improve performance when viewing analytics dashboards.
+    """
+    survey = models.OneToOneField(Survey, related_name='analysis_summary', on_delete=models.CASCADE)
+    response_count = models.IntegerField(default=0)
+    average_satisfaction = models.FloatField(default=0.0, help_text="Average NPS or satisfaction score")
+    median_satisfaction = models.FloatField(default=0.0)
+    satisfaction_confidence_low = models.FloatField(default=0.0, help_text="95% confidence interval - lower bound")
+    satisfaction_confidence_high = models.FloatField(default=0.0, help_text="95% confidence interval - upper bound")
+    satisfaction_score = models.FloatField(default=0.0, help_text="Calculated as [positive % - negative %]")
+    
+    # Language breakdown stored as JSON: {"en": 45, "de": 12, ...}
+    language_breakdown = models.JSONField(default=dict)
+    
+    # Aggregated sentiment data
+    positive_percentage = models.FloatField(default=0.0)
+    negative_percentage = models.FloatField(default=0.0)
+    neutral_percentage = models.FloatField(default=0.0)
+    
+    # Top clusters data - stored as JSON arrays of cluster IDs
+    top_clusters = models.JSONField(default=list, help_text="IDs of most frequent clusters")
+    top_positive_clusters = models.JSONField(default=list, help_text="IDs of most positive clusters")
+    top_negative_clusters = models.JSONField(default=list, help_text="IDs of most negative clusters") 
+    top_neutral_clusters = models.JSONField(default=list, help_text="IDs of most neutral clusters")
+    
+    # Weighted sentiment divergence
+    sentiment_divergence = models.FloatField(default=0.0, help_text="Frequency weighted sentiment score divergence")
+    
+    # Timestamp for when this summary was last updated
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Analysis Summary for {self.survey.title} ({self.last_updated})"
+
+
+class CustomWordCluster(models.Model):
+    """
+    Represents a user-defined cluster of related words or phrases for analysis.
+    These clusters can be applied across all surveys for consistent analysis.
+    """
+    name = models.CharField(max_length=100, help_text="Name of the custom cluster (e.g., 'Customer Service')")
+    description = models.TextField(blank=True, help_text="Description of what this cluster represents")
+    keywords = models.JSONField(default=list, help_text="List of keywords/phrases that belong to this cluster")
+    is_active = models.BooleanField(default=True, help_text="Whether this cluster is currently active")
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_clusters')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        verbose_name = "Custom Word Cluster"
+        verbose_name_plural = "Custom Word Clusters"
+
+    def __str__(self):
+        return f"{self.name} ({len(self.keywords)} keywords)"
 

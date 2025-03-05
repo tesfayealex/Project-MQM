@@ -16,6 +16,7 @@ import { Survey, SurveyQuestion } from '@/types/survey';
 import QuestionForm from './QuestionForm';
 import { format } from 'date-fns';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { toast } from "@/components/ui/use-toast";
 
 // Available languages
 const AVAILABLE_LANGUAGES = [
@@ -39,32 +40,42 @@ type QuestionType = z.infer<typeof questionSchema>;
 
 // Validation schema
 const surveySchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  headlines: z.record(z.string(), z.string()).optional(),
-  survey_texts: z.record(z.string(), z.string()).optional(),
-  is_active: z.boolean().default(true),
-  languages: z.array(z.string()).min(1, "At least one language is required"),
-  questions: z.array(questionSchema).default([]),
+  headlines: z.record(z.string()).optional(),
+  survey_texts: z.record(z.string()).optional(),
+  end_survey_titles: z.record(z.string()).optional(),
+  end_survey_texts: z.record(z.string()).optional(),
+  expired_survey_titles: z.record(z.string()).optional(),
+  expired_survey_texts: z.record(z.string()).optional(),
   end_survey_title: z.string().optional(),
   end_survey_text: z.string().optional(),
-  end_survey_titles: z.record(z.string(), z.string()).optional(),
-  end_survey_texts: z.record(z.string(), z.string()).optional(),
   expired_survey_title: z.string().optional(),
   expired_survey_text: z.string().optional(),
-  expired_survey_titles: z.record(z.string(), z.string()).optional(),
-  expired_survey_texts: z.record(z.string(), z.string()).optional(),
-  expiry_date: z.date().optional().nullable(),
-  // Project info fields
+  languages: z.array(z.string()).min(1, "At least one language is required"),
+  format: z.string(),
+  type: z.string(),
+  max_participants: z.string().transform(val => parseInt(val) || 100),
+  expiry_date: z.date().nullable().optional(),
+  analysis_end_date: z.date().nullable().optional(),
+  analysis_cluster: z.string().optional(),
   building_name: z.string().optional(),
-  project_name: z.string().optional(),
+  short_id: z.string().optional(),
   project_description: z.string().optional(),
-  token: z.string().optional(),
-  // Address fields
-  street: z.string().optional(),
+  street_number: z.string().optional(),
+  city_code: z.string().optional(),
   city: z.string().optional(),
-  postal_code: z.string().optional(),
   country: z.string().optional(),
+  token: z.string().optional(), // Legacy token field
+  tokens: z.array(
+    z.object({
+      id: z.number().optional(),
+      token: z.string(),
+      description: z.string()
+    })
+  ).optional(),
+  is_active: z.boolean().default(true),
+  questions: z.array(questionSchema).default([]),
 });
 
 type SurveyFormValues = z.infer<typeof surveySchema>;
@@ -122,6 +133,10 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
           new Date(initialData.expiry_date) : 
           initialData.expiry_date : 
         undefined,
+      // Add default values for required fields
+      format: initialData?.format || 'online',
+      type: initialData?.type || 'public',
+      max_participants: initialData?.max_participants?.toString() || '100',
       building_name: initialData?.building_name || '',
       project_name: initialData?.project_name || '',
       project_description: initialData?.project_description || '',
@@ -130,6 +145,7 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
       city: initialData?.city || '',
       postal_code: initialData?.postal_code || '',
       country: initialData?.country || '',
+      tokens: initialData?.tokens || [],
     },
     mode: 'onChange'
   });
@@ -148,9 +164,69 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
     });
   }, [formState]);
 
+  // Function to generate a token
+  const generateToken = () => {
+    return Math.random().toString(36).substring(2, 15);
+  };
+  
+  // State for managing tokens
+  const [tokens, setTokens] = useState<{id?: number, token: string, description: string}[]>(
+    initialData?.tokens && initialData.tokens.length > 0 
+      ? initialData.tokens 
+      : initialData?.token 
+        ? [{ token: initialData.token, description: 'Default Token' }] 
+        : [{ token: generateToken(), description: 'Default Token' }]
+  );
+  
+  // Add a new token
+  const addToken = () => {
+    setTokens([...tokens, { token: generateToken(), description: 'New Token' }]);
+  };
+  
+  // Remove a token
+  const removeToken = (index: number) => {
+    // Prevent removing the last token
+    if (tokens.length <= 1) {
+      return;
+    }
+    const newTokens = [...tokens];
+    newTokens.splice(index, 1);
+    setTokens(newTokens);
+  };
+  
+  // Update token value
+  const updateToken = (index: number, field: 'token' | 'description', value: string) => {
+    const newTokens = [...tokens];
+    newTokens[index] = { ...newTokens[index], [field]: value };
+    setTokens(newTokens);
+  };
+
   // Handle form submission
   const handleSubmit = async (data: SurveyFormValues) => {
     console.log('Form submission started');
+    
+    // Check if we have at least one token
+    if (tokens.length === 0) {
+      setTokens([{ token: generateToken(), description: 'Default Token' }]);
+      toast({
+        title: "Token Required",
+        description: "A default token has been generated for you.",
+        variant: "default"
+      });
+      return; // Don't submit until we have a token
+    }
+    
+    // Validate that all tokens have values
+    const invalidTokens = tokens.filter(t => !t.token || !t.description);
+    if (invalidTokens.length > 0) {
+      toast({
+        title: "Invalid Tokens",
+        description: "All tokens must have both a token value and description.",
+        variant: "destructive"
+      });
+      return; // Don't submit with invalid tokens
+    }
+    
     console.log('Raw form data:', data);
     
     // Format the data for submission
@@ -192,7 +268,9 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
           is_required: q.is_required ?? true,
           placeholders: placeholders
         };
-      })
+      }),
+      // Add the tokens from our state
+      tokens: tokens
     };
     
     console.log('Formatted data for submission:', formattedData);
@@ -309,6 +387,65 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
                     date={methods.watch('expiry_date') || undefined}
                     setDate={(date) => methods.setValue('expiry_date', date || undefined)}
                   />
+                </div>
+
+                {/* Add Survey Format field */}
+                <div className="space-y-2">
+                  <Label htmlFor="format">Survey Format</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    id="format" 
+                    {...methods.register('format')}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select Format</option>
+                    <option value="online">Online</option>
+                    <option value="face_to_face">Face to Face</option>
+                  </select>
+                  {methods.formState.errors.format && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {methods.formState.errors.format.message || "Survey Format is required"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Add Survey Type field */}
+                <div className="space-y-2">
+                  <Label htmlFor="type">Survey Type</Label>
+                  <select 
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    id="type" 
+                    {...methods.register('type')}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select Type</option>
+                    <option value="friends_family">Friends and Family</option>
+                    <option value="public">Public</option>
+                    <option value="professional">Professional</option>
+                    <option value="single_company">Single Company</option>
+                    <option value="intracompany">Intracompany</option>
+                  </select>
+                  {methods.formState.errors.type && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {methods.formState.errors.type.message || "Survey Type is required"}
+                    </p>
+                  )}
+                </div>
+
+                {/* Add Maximum Participants field */}
+                <div className="space-y-2">
+                  <Label htmlFor="max_participants">Maximum Participants</Label>
+                  <Input 
+                    id="max_participants" 
+                    type="number"
+                    placeholder="100" 
+                    {...methods.register('max_participants')} 
+                  />
+                  {methods.formState.errors.max_participants && (
+                    <p className="text-sm text-red-500 mt-1">
+                      {methods.formState.errors.max_participants.message || "Maximum Participants is required"}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2">
@@ -470,48 +607,78 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="token">
-                    Public Access Token
-                    <span className="ml-2 text-sm text-gray-500">
-                      (Required for QR code and public access)
-                    </span>
-                  </Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="token"
-                      {...methods.register('token')}
-                      placeholder="Enter or generate token"
-                    />
+                  <div className="flex justify-between">
+                    <Label>
+                      Public Access Tokens
+                      <span className="ml-2 text-sm text-gray-500">
+                        (Required for QR codes and public access)
+                      </span>
+                    </Label>
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => {
-                        const newToken = Math.random().toString(36).substring(2, 15);
-                        methods.setValue('token', newToken);
-                      }}
+                      size="sm"
+                      onClick={addToken}
                     >
-                      Generate
+                      Add Token
                     </Button>
+                  </div>
+                  
+                  <div className="space-y-4 mt-2">
+                    {tokens.map((token, index) => (
+                      <div key={index} className="flex gap-2 items-start border p-3 rounded-md bg-gray-50">
+                        <div className="flex-1 space-y-2">
+                          <div>
+                            <Label htmlFor={`token-${index}`}>Token</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id={`token-${index}`}
+                                value={token.token}
+                                onChange={(e) => updateToken(index, 'token', e.target.value)}
+                                placeholder="Enter token"
+                                className="text-sm"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateToken(index, 'token', generateToken())}
+                              >
+                                Generate
+                              </Button>
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor={`description-${index}`}>Description</Label>
+                            <Input
+                              id={`description-${index}`}
+                              value={token.description}
+                              onChange={(e) => updateToken(index, 'description', e.target.value)}
+                              placeholder="Enter description (e.g., Group A, Office Staff)"
+                              className="text-sm"
+                            />
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => removeToken(index)}
+                          disabled={tokens.length <= 1}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                {initialData?.token && (
+                {initialData?.id && (
                   <div className="mt-4 p-4 border rounded-lg bg-gray-50">
                     <h3 className="text-sm font-medium mb-2">Public Access Information</h3>
                     <div className="space-y-2">
                       <p className="text-sm text-gray-600">
-                        Public Survey URL:
-                        <a
-                          href={`/survey/${initialData.token}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-2 text-blue-600 hover:underline break-all"
-                        >
-                          {window.location.origin}/survey/{initialData.token}
-                        </a>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        QR Code will be available after saving the survey.
+                        QR Codes will be available after saving the survey in the survey details page.
                       </p>
                     </div>
                   </div>
@@ -568,9 +735,60 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
             <div className="text-red-500 text-sm">
               <p>Please fix the following errors:</p>
               <ul className="list-disc list-inside">
-                {Object.entries(formState.errors).map(([key, error]) => (
-                  <li key={key}>{error?.message?.toString() || `Invalid ${key}`}</li>
-                ))}
+                {Object.entries(formState.errors).map(([key, error]) => {
+                  // Map field keys to user-friendly names
+                  const fieldMap: Record<string, string> = {
+                    title: "Title",
+                    description: "Description",
+                    languages: "Languages",
+                    format: "Survey Format",
+                    type: "Survey Type",
+                    max_participants: "Maximum Participants",
+                    token: "Access Token",
+                    tokens: "Access Tokens",
+                    questions: "Questions",
+                    expiry_date: "Expiry Date",
+                    analysis_end_date: "Analysis End Date",
+                    analysis_cluster: "Analysis Cluster",
+                    building_name: "Building Name",
+                    project_name: "Project Name",
+                    project_description: "Project Description",
+                    street: "Street",
+                    postal_code: "Postal Code",
+                    city: "City",
+                    country: "Country",
+                  };
+
+                  // Get user-friendly field name or fallback to the key
+                  const fieldName = fieldMap[key] || key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
+                  
+                  // Create a proper error message
+                  let errorMessage = '';
+                  
+                  if (error?.message) {
+                    // Use the provided error message if available
+                    errorMessage = `${fieldName}: ${error.message.toString()}`;
+                  } else if (key === 'tokens') {
+                    // Special handling for tokens array
+                    errorMessage = `${fieldName}: Please ensure all tokens have valid values and descriptions`;
+                  } else {
+                    // Default required message with field name
+                    errorMessage = `The "${fieldName}" field is required`;
+                  }
+                  
+                  // Handle nested errors (like tokens.0.token)
+                  if (key.includes('.')) {
+                    const parts = key.split('.');
+                    if (parts[0] === 'tokens' && parts.length === 3) {
+                      const index = parseInt(parts[1]) + 1;
+                      const field = parts[2] === 'token' ? 'value' : parts[2];
+                      errorMessage = `Token #${index}: The ${field} is required`;
+                    }
+                  }
+                  
+                  console.log(`Error for ${key}:`, error);
+                  return <li key={key}>{errorMessage}</li>;
+                })}
               </ul>
             </div>
           )}

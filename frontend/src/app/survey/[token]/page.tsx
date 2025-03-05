@@ -93,7 +93,7 @@ export default function PublicSurvey({ params }: PageProps) {
     }
 
     loadSurvey();
-  }, [token, router, currentLanguage]);
+  }, [token, router]);
 
   function handleLanguageChange(lang: string) {
     setCurrentLanguage(lang);

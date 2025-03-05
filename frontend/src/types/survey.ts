@@ -11,6 +11,15 @@ export interface SurveyQuestion {
   placeholders?: Record<string, string>;
 }
 
+export interface SurveyToken {
+  id: number;
+  token: string;
+  description: string;
+  created_at?: string;
+  survey_url?: string;
+  qr_code_url?: string;
+}
+
 export interface Survey {
   id: number;
   title: string;
@@ -50,8 +59,12 @@ export interface Survey {
   city?: string;
   country?: string;
   
-  // Project Token
+  // Project Token (legacy)
   token?: string;
+  // Project Tokens (new multi-token support)
+  tokens?: SurveyToken[];
+  // Primary token (convenience property)
+  primary_token?: string;
   
   // Stats
   response_count?: number;

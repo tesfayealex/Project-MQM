@@ -12,6 +12,7 @@ import { Survey } from '@/types/survey';
 import { handleAuthError } from '@/lib/auth-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
+import Image from 'next/image';
 
 export default function SurveyDetail({ params }: { params: { id: string } | { value: string } | string }) {
   const router = useRouter();
@@ -20,7 +21,16 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [surveyId, setSurveyId] = useState<string | null>(null);
-  const [qrCodeData, setQrCodeData] = useState<{survey_url: string, token: string, qr_code_url: string} | null>(null);
+  const [qrCodeData, setQrCodeData] = useState<{
+    tokens: Array<{
+      id: number|null,
+      token: string,
+      description: string,
+      survey_url: string,
+      qr_code_url: string
+    }>,
+    primary_token: string
+  } | null>(null);
 
   useEffect(() => {
     async function fetchSurvey() {
@@ -131,12 +141,20 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
           <h1 className="text-3xl font-bold tracking-tight">{survey.title}</h1>
         </div>
         {surveyId && (
-          <Link href={`/dashboard/surveys/${surveyId}/edit`}>
-            <Button>
-              <PencilIcon className="h-4 w-4 mr-2" />
+          <div className="space-x-4">
+            <Button
+              onClick={() => router.push(`/dashboard/surveys/${surveyId}/analysis`)}
+              variant="outline"
+            >
+              View Analysis
+            </Button>
+            <Button
+              onClick={() => router.push(`/dashboard/surveys/${surveyId}/edit`)}
+              variant="outline"
+            >
               Edit Survey
             </Button>
-          </Link>
+          </div>
         )}
       </div>
       
@@ -226,7 +244,7 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
         </Card>
 
         {/* QR Code & Public Access */}
-        {survey.token && (
+        {((survey.token && qrCodeData) || (survey.tokens && survey.tokens.length > 0)) && (
           <Card className="p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Public Access</h2>
@@ -235,127 +253,99 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
               </Badge>
             </div>
             
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500">Survey Token</h3>
-                  <div className="flex items-center mt-1 gap-2">
-                    <Badge variant="secondary" className="text-md px-3 py-1">
-                      {survey.token}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {qrCodeData && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Public Survey Link</h3>
-                    <div className="mt-1">
-                      <a 
-                        href={`/survey/${survey.token}`}
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline break-all"
-                      >
-                        {window.location.origin}/survey/{survey.token}
-                      </a>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Debug Button */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    try {
-                      // Test direct API access
-                      const qrUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/surveys/surveys/${surveyId}/qr_code/`;
-                      window.open(qrUrl, '_blank');
+            <div className="space-y-6">
+              {qrCodeData ? (
+                qrCodeData.tokens.map((tokenData, index) => (
+                  <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500">
+                            Token: <span className="font-bold">{tokenData.description}</span>
+                          </h3>
+                          <div className="flex items-center mt-1 gap-2">
+                            <Badge variant="secondary" className="text-md px-3 py-1">
+                              {tokenData.token}
+                            </Badge>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(tokenData.token);
+                                toast({
+                                  title: "Token Copied",
+                                  description: "Token copied to clipboard",
+                                });
+                              }}
+                            >
+                              Copy
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h3 className="text-sm font-medium text-gray-500">Public Survey Link</h3>
+                          <div className="mt-1">
+                            <a 
+                              href={`/survey/${tokenData.token}`}
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline break-all"
+                            >
+                              {window.location.origin}/survey/{tokenData.token}
+                            </a>
+                          </div>
+                          <div className="mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/survey/${tokenData.token}`);
+                                toast({
+                                  title: "URL Copied",
+                                  description: "Survey URL copied to clipboard",
+                                });
+                              }}
+                            >
+                              Copy URL
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
                       
-                      toast({
-                        title: "Debug Info",
-                        description: `Opening QR code directly from: ${qrUrl}`,
-                      });
-                    } catch (err: any) {
-                      toast({
-                        title: "Debug Error",
-                        description: err.message,
-                        variant: "destructive"
-                      });
-                    }
-                  }}
-                >
-                  Debug: Open QR Code Directly
-                </Button>
-                
-                <p className="text-sm text-gray-500 mt-2">
-                  Share this link or QR code for participants to access the survey without logging in.
-                </p>
-              </div>
-              
-              {qrCodeData && (
-                <div className="flex justify-center items-center border rounded-lg p-4">
-                  <div className="text-center">
-                    <div className="mb-2">
-                      <a href={qrCodeData.qr_code_url} target="_blank" rel="noopener noreferrer">
-                        <img 
-                          src={qrCodeData.qr_code_url} 
-                          alt="Survey QR Code" 
-                          className="max-w-[200px] mx-auto"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null; 
-                            toast({
-                              title: "QR Code Error",
-                              description: `Failed to load image from: ${qrCodeData.qr_code_url}`,
-                              variant: "destructive"
-                            });
-                            e.currentTarget.src = "data:image/svg+xml;charset=utf-8,%3Csvg width='200' height='200' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100%25' height='100%25' fill='%23f0f0f0'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='system-ui'%3EImage Error%3C/text%3E%3C/svg%3E";
+                      <div className="flex flex-col items-center justify-center">
+                        <h3 className="text-sm font-medium text-gray-500 mb-2">QR Code</h3>
+                        <div className="border rounded p-2 bg-white">
+                          <Image 
+                            src={tokenData.qr_code_url} 
+                            alt="QR Code for Survey" 
+                            width={150} 
+                            height={150}
+                          />
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => {
+                            // Create a temporary anchor element
+                            const a = document.createElement('a');
+                            a.href = tokenData.qr_code_url;
+                            a.download = `survey-qr-code-${tokenData.token}.png`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
                           }}
-                        />
-                      </a>
+                        >
+                          Download
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-500">
-                      Scan to access survey
-                    </p>
-                    <p className="text-xs text-blue-500 mt-2">
-                      <a href={qrCodeData.qr_code_url} target="_blank" rel="noopener noreferrer">
-                        Open QR code in new tab
-                      </a>
-                    </p>
                   </div>
-                </div>
-              )}
-              
-              {!qrCodeData && survey.token && (
-                <div className="flex justify-center items-center border rounded-lg p-4 bg-gray-50">
-                  <div className="text-center">
-                    <p className="text-sm text-gray-500">
-                      QR Code data could not be loaded.
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={async () => {
-                        try {
-                          const data = await getSurveyQRCodeData(surveyId || '');
-                          setQrCodeData(data);
-                          toast({
-                            title: "Success",
-                            description: "QR code data loaded successfully",
-                          });
-                        } catch (err: any) {
-                          toast({
-                            title: "Error",
-                            description: err.message || "Failed to load QR code data",
-                            variant: "destructive"
-                          });
-                        }
-                      }}
-                    >
-                      Try Again
-                    </Button>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center p-6">
+                  <p>QR Code data is unavailable</p>
                 </div>
               )}
             </div>
@@ -388,55 +378,50 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
         {/* Survey Settings */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Survey Settings</h2>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Format</h3>
-              <Badge variant="outline" className="mt-1">
-                {survey.format.replace('_', ' ').toUpperCase()}
-              </Badge>
+              <h3 className="text-lg font-semibold mb-2">Survey Format</h3>
+              <p className="text-gray-600">{survey?.format || 'Not specified'}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Type</h3>
-              <Badge variant="outline" className="mt-1">
-                {survey.type.replace('_', ' ').toUpperCase()}
-              </Badge>
+              <h3 className="text-lg font-semibold mb-2">Survey Type</h3>
+              <p className="text-gray-600">{survey?.type || 'Not specified'}</p>
             </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Max Participants</h3>
-              <p className="mt-1">{survey.max_participants || 'Unlimited'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Analysis Cluster</h3>
-              <p className="mt-1">{survey.analysis_cluster || 'Standard'}</p>
+          </div>
+
+          <div className="mt-4">
+            <h3 className="text-lg font-semibold mb-2">Survey Dates</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Expiry Date</p>
+                <p className="text-gray-600">
+                  {survey?.expiry_date 
+                    ? new Date(survey.expiry_date).toLocaleDateString() 
+                    : 'Not set'}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Analysis End Date</p>
+                <p className="text-gray-600">
+                  {survey?.analysis_end_date 
+                    ? new Date(survey.analysis_end_date).toLocaleDateString() 
+                    : 'Not set'}
+                </p>
+              </div>
             </div>
           </div>
         </Card>
 
-        {/* Dates */}
+        {/* Max Participants */}
         <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Important Dates</h2>
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Created</h3>
-              <p className="mt-1">{format(new Date(survey.created_at), 'PPP')}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Last Updated</h3>
-              <p className="mt-1">{format(new Date(survey.updated_at), 'PPP')}</p>
-            </div>
-            {survey.end_date && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">End Date</h3>
-                <p className="mt-1">{format(new Date(survey.end_date), 'PPP')}</p>
-              </div>
-            )}
-            {survey.analysis_end_date && (
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Analysis End Date</h3>
-                <p className="mt-1">{format(new Date(survey.analysis_end_date), 'PPP')}</p>
-              </div>
-            )}
-          </div>
+          <h2 className="text-xl font-semibold mb-4">Max Participants</h2>
+          <p className="mt-1">{survey.max_participants || 'Unlimited'}</p>
+        </Card>
+
+        {/* Analysis Cluster */}
+        <Card className="p-6">
+          <h2 className="text-xl font-semibold mb-4">Analysis Cluster</h2>
+          <p className="mt-1">{survey.analysis_cluster || 'Standard'}</p>
         </Card>
       </div>
     </div>

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Survey, Question, Response, Answer, SurveyToken
+from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -166,13 +166,105 @@ class ResponseSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
     def create(self, validated_data):
-        answers_data = validated_data.pop('answers', [])
-        response = Response.objects.create(**validated_data)
+        # Forward the token (if available) to the model
+        token = self.context.get('token')
+        if token:
+            validated_data['token'] = token
+        return super().create(validated_data)
+
+
+class WordClusterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WordCluster
+        fields = [
+            'id', 'survey', 'name', 'description', 'sentiment_score', 
+            'frequency', 'is_positive', 'is_negative', 'is_neutral', 
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class CustomWordClusterSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = CustomWordCluster
+        fields = [
+            'id', 'name', 'description', 'keywords', 'is_active',
+            'created_by', 'created_by_name', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'created_by', 'created_by_name']
+        extra_kwargs = {
+            'description': {'required': False, 'write_only': True},
+            'keywords': {'required': False, 'write_only': True},
+            'is_active': {'required': False, 'default': True, 'write_only': True}
+        }
+    
+    def get_created_by_name(self, obj):
+        return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip() or obj.created_by.username
+
+
+class ResponseWordSerializer(serializers.ModelSerializer):
+    clusters = WordClusterSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = ResponseWord
+        fields = [
+            'id', 'response', 'answer', 'word', 'original_text',
+            'frequency', 'sentiment_score', 'clusters', 'language', 'created_at'
+        ]
+        read_only_fields = ['created_at']
+
+
+class SurveyAnalysisSummarySerializer(serializers.ModelSerializer):
+    survey_title = serializers.SerializerMethodField()
+    top_clusters_data = serializers.SerializerMethodField()
+    top_positive_clusters_data = serializers.SerializerMethodField()
+    top_negative_clusters_data = serializers.SerializerMethodField()
+    top_neutral_clusters_data = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = SurveyAnalysisSummary
+        fields = [
+            'id', 'survey', 'survey_title', 'response_count',
+            'average_satisfaction', 'median_satisfaction',
+            'satisfaction_confidence_low', 'satisfaction_confidence_high',
+            'satisfaction_score', 'language_breakdown',
+            'positive_percentage', 'negative_percentage', 'neutral_percentage',
+            'top_clusters', 'top_clusters_data',
+            'top_positive_clusters', 'top_positive_clusters_data',
+            'top_negative_clusters', 'top_negative_clusters_data',
+            'top_neutral_clusters', 'top_neutral_clusters_data',
+            'sentiment_divergence', 'last_updated'
+        ]
+        read_only_fields = ['last_updated']
+    
+    def get_survey_title(self, obj):
+        return obj.survey.title if obj.survey else ""
+    
+    def get_top_clusters_data(self, obj):
+        cluster_ids = obj.top_clusters
+        return self._get_clusters_data(cluster_ids)
         
-        for answer_data in answers_data:
-            Answer.objects.create(response=response, **answer_data)
+    def get_top_positive_clusters_data(self, obj):
+        cluster_ids = obj.top_positive_clusters
+        return self._get_clusters_data(cluster_ids)
         
-        return response
+    def get_top_negative_clusters_data(self, obj):
+        cluster_ids = obj.top_negative_clusters
+        return self._get_clusters_data(cluster_ids)
+        
+    def get_top_neutral_clusters_data(self, obj):
+        cluster_ids = obj.top_neutral_clusters
+        return self._get_clusters_data(cluster_ids)
+    
+    def _get_clusters_data(self, cluster_ids):
+        # Helper method to fetch cluster data from IDs
+        if not cluster_ids:
+            return []
+            
+        clusters = WordCluster.objects.filter(id__in=cluster_ids)
+        return WordClusterSerializer(clusters, many=True).data
 
 
 class SurveyDetailSerializer(SurveySerializer):
