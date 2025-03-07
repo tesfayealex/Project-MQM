@@ -1,14 +1,23 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 import SurveyForm from '@/components/surveys/SurveyForm';
 import { createSurvey } from '@/lib/services/survey-service';
 import { handleAuthError } from '@/lib/auth-utils';
+import { useTranslation } from 'react-i18next';
 
 export default function SurveyFormClient() {
   const router = useRouter();
+  const { t, i18n } = useTranslation('surveys', { useSuspense: false });
+
+  useEffect(() => {
+    i18n.loadNamespaces('surveys').catch(err => 
+      console.error('Failed to load surveys namespace:', err)
+    );
+  }, [i18n]);
+
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (data: any) => {
@@ -20,7 +29,7 @@ export default function SurveyFormClient() {
       const surveyData = {
         ...data,
         // Ensure required fields are set
-        title: data.title || 'Untitled Survey',
+        title: data.title || t('defaults.untitledSurvey'),
         languages: data.languages && data.languages.length ? data.languages : ['en'],
         is_active: data.is_active !== undefined ? data.is_active : true,
         
@@ -39,8 +48,8 @@ export default function SurveyFormClient() {
       console.log('Survey created successfully:', response);
       
       toast({
-        title: 'Survey Created',
-        description: 'Your survey has been created successfully.',
+        title: t('success.created'),
+        description: t('success.surveyCreated'),
       });
       
       router.push(`/dashboard/surveys`);
@@ -48,30 +57,24 @@ export default function SurveyFormClient() {
       console.error('Error creating survey:', error);
       
       // Handle authentication errors
-      const isAuthError = await handleAuthError(error);
-      if (!isAuthError) {
-        // Get a more detailed error message
-        let errorMessage = 'Failed to create survey. Please try again.';
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-        
-        // Show error toast
-        toast({
-          variant: 'destructive',
-          title: 'Error Creating Survey',
-          description: errorMessage,
-        });
+      handleAuthError(error);
+      
+      // Get a more detailed error message
+      let errorMessage = t('errors.createFailed');
+      if (error instanceof Error) {
+        errorMessage = error.message;
       }
+      
+      // Show error toast
+      toast({
+        variant: 'destructive',
+        title: t('errors.error'),
+        description: errorMessage,
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
-  return (
-    <SurveyForm
-      onSubmit={handleSubmit}
-      isLoading={isLoading}
-    />
-  );
+  return <SurveyForm onSubmit={handleSubmit} isLoading={isLoading} />;
 } 

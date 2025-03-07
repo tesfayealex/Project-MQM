@@ -41,19 +41,17 @@ class SurveySerializer(serializers.ModelSerializer):
             'id', 'title', 'description',
             # Multilingual Content
             'headlines', 'survey_texts',
-            # Project Information
-            'building_name', 'short_id', 'project_description',
             # Project Address
-            'street_number', 'city_code', 'city', 'country',
+            'city', 'country',
             # Project Token (legacy)
             'token',
             # Project Tokens (new)
             'tokens',
             # Project Details
-            'languages', 'format', 'type', 'max_participants',
-            'expiry_date', 'analysis_end_date', 'analysis_cluster',
+            'languages', 'format', 'type',
+            'start_datetime', 'expiry_date', 'analysis_cluster',
             # End Survey Information
-            'end_survey_titles', 'end_survey_texts', 'expired_survey_titles', 'expired_survey_texts',
+            'start_survey_titles', 'start_survey_texts', 'end_survey_titles', 'end_survey_texts', 'expired_survey_titles', 'expired_survey_texts',
             # Metadata
             'created_by', 'created_at', 'updated_at', 'is_active',
             # Related

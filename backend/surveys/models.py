@@ -43,14 +43,7 @@ class Survey(models.Model):
     headlines = models.JSONField(default=dict, blank=True, help_text="Headline text for each language: {'en': 'English Headline', 'de': 'German Headline'}")
     survey_texts = models.JSONField(default=dict, blank=True, help_text="Survey introduction text for each language")
     
-    # Project Information
-    building_name = models.CharField(max_length=255, blank=True, null=True)
-    short_id = models.CharField(max_length=50, blank=True, null=True)
-    project_description = models.TextField(blank=True, null=True)
-    
     # Project Address
-    street_number = models.CharField(max_length=100, blank=True, null=True)
-    city_code = models.CharField(max_length=50, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
     
@@ -65,12 +58,13 @@ class Survey(models.Model):
     )
     format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='online')
     type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='public')
-    max_participants = models.PositiveIntegerField(default=100)
-    expiry_date = models.DateTimeField(blank=True, null=True)
-    analysis_end_date = models.DateTimeField(blank=True, null=True)
+    start_datetime = models.DateTimeField(blank=True, null=True)
+    expiry_date = models.DateTimeField(blank=True, null=True, help_text="End date and time for the survey")
     analysis_cluster = models.CharField(max_length=50, choices=ANALYSIS_CLUSTER_CHOICES, default='Standard', blank=True, null=True)
     
     # End Survey Information
+    start_survey_titles = models.JSONField(default=dict, blank=True, help_text="Titles to show when survey has not started yet for each language")
+    start_survey_texts = models.JSONField(default=dict, blank=True, help_text="Messages to show when survey has not started yet for each language")
     end_survey_titles = models.JSONField(default=dict, blank=True, help_text="Titles to show at the end of survey for each language")
     end_survey_texts = models.JSONField(default=dict, blank=True, help_text="Messages to show at the end of survey for each language")
     expired_survey_titles = models.JSONField(default=dict, blank=True, help_text="Expired survey titles for each language")
@@ -83,7 +77,7 @@ class Survey(models.Model):
     is_active = models.BooleanField(default=True)
 
     def __str__(self):
-        return self.title or self.short_id
+        return self.title
 
     @property
     def primary_token(self):

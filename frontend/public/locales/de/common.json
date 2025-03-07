@@ -1,0 +1,20 @@
+{
+  "app": {
+    "name": "meineSchnellNachricht",
+    "switchLanguage": "Sprache"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "surveys": "Umfragen",
+    "analytics": "Analysen",
+    "users": "Benutzer",
+    "settings": "Einstellungen",
+    "logout": "Abmelden"
+  },
+  "languages": {
+    "en": "Englisch",
+    "fr": "Französisch",
+    "es": "Spanisch",
+    "de": "Deutsch"
+  }
+} 

@@ -1,0 +1,23 @@
+{
+  "welcome": "Welcome to your Dashboard",
+  "overview": "Overview",
+  "recent": "Recent Activity",
+  "stats": "Statistics",
+  "surveys": {
+    "title": "Surveys",
+    "active": "Active Surveys",
+    "completed": "Completed Surveys",
+    "create": "Create Survey"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "responses": "Total Responses",
+    "completion": "Completion Rate",
+    "engagementScore": "Engagement Score"
+  },
+  "profile": {
+    "title": "Profile",
+    "edit": "Edit Profile",
+    "settings": "Settings"
+  }
+} 

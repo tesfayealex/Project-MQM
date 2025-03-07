@@ -1,0 +1,259 @@
+{
+  "list": {
+    "title": "Umfragen",
+    "description": "Erstellen und verwalten Sie Ihre Umfragen",
+    "create": "Umfrage erstellen",
+    "columns": {
+      "name": "Name",
+      "status": "Status",
+      "responses": "Antworten",
+      "created": "Erstellt",
+      "actions": "Aktionen"
+    },
+    "status": {
+      "active": "Aktiv",
+      "draft": "Entwurf",
+      "completed": "Abgeschlossen",
+      "archived": "Archiviert",
+      "inactive": "Inaktiv"
+    },
+    "empty": "Keine Umfragen gefunden",
+    "loading": "Umfragen werden geladen..."
+  },
+  "detail": {
+    "view": "Umfrage anzeigen",
+    "edit": "Umfrage bearbeiten",
+    "delete": "Umfrage löschen",
+    "stats": "Umfragestatistiken",
+    "analysis": "Antwortanalyse",
+    "responses": "Gesamtantworten",
+    "created": "Erstellt am",
+    "updated": "Zuletzt aktualisiert am",
+    "status": "Status",
+    "back": "Zurück zu Umfragen",
+    "share": "Umfrage teilen",
+    "send": "Per E-Mail senden",
+    "basicInfo": "Grundinformationen",
+    "noDescription": "Keine Beschreibung vorhanden",
+    "languages": "Sprachen",
+    "questions": "Fragen",
+    "questionsCount": "Fragen",
+    "question": "Frage",
+    "untitledQuestion": "Unbenannte Frage",
+    "projectDetails": "Projektdetails",
+    "buildingName": "Gebäudename",
+    "shortId": "Kurz-ID",
+    "projectDescription": "Projektbeschreibung",
+    "token": "Token",
+    "publicAccess": "Öffentlicher Zugang",
+    "available": "Verfügbar",
+    "qrUnavailable": "QR-Code nicht verfügbar",
+    "qrUnavailableDesc": "QR-Code-Daten sind nicht verfügbar",
+    "publicSurveyLink": "Öffentlicher Umfragelink",
+    "qrCode": "QR-Code",
+    "qrCodeAlt": "QR-Code für Umfrage"
+  },
+  "create": {
+    "title": "Umfrage erstellen",
+    "description": "Erstellen Sie ein neues Umfrageformular",
+    "survey_name": "Umfragename",
+    "survey_description": "Umfragebeschreibung",
+    "add_question": "Frage hinzufügen",
+    "save_draft": "Entwurf speichern",
+    "publish": "Umfrage veröffentlichen",
+    "cancel": "Abbrechen"
+  },
+  "edit": {
+    "title": "Umfrage bearbeiten",
+    "description": "Bearbeiten Sie Ihre bestehende Umfrage",
+    "save_changes": "Änderungen speichern"
+  },
+  "stats": {
+    "title": "Umfragestatistiken",
+    "description": "Antwortstatistiken für Ihre Umfrage anzeigen",
+    "total": "Gesamtantworten",
+    "completion_rate": "Abschlussrate",
+    "avg_time": "Durchschnittliche Abschlusszeit",
+    "charts": {
+      "responses": "Anzahl der Antworten",
+      "daily": "Tägliche Antworten",
+      "devices": "Gerätenutzung",
+      "locations": "Antwortstandorte"
+    }
+  },
+  "analysis": {
+    "title": "Antwortanalyse",
+    "description": "Analysieren Sie Antwortmuster und Erkenntnisse",
+    "overview": "Antwortübersicht",
+    "sentiment": "Stimmungsanalyse",
+    "word_cloud": "Wortwolke",
+    "key_topics": "Schlüsselthemen",
+    "explore": "Antworten erkunden"
+  },
+  "questions": {
+    "title": "Umfragefragen",
+    "add": "Frage hinzufügen",
+    "addAnother": "Weitere Frage hinzufügen",
+    "empty": "Noch keine Fragen. Fügen Sie Ihre erste Frage hinzu, um zu beginnen.",
+    "questionNumber": "Frage {{number}}",
+    "moveUp": "Nach oben",
+    "moveDown": "Nach unten",
+    "remove": "Frage entfernen",
+    "type": "Fragetyp",
+    "selectType": "Fragetyp auswählen",
+    "textWithLanguage": "Fragetext - {{language}}",
+    "textPlaceholder": "Frage in {{language}} eingeben",
+    "placeholderWithLanguage": "Platzhalter - {{language}}",
+    "placeholderInputText": "Platzhalter in {{language}} eingeben",
+    "types": {
+      "text": "Freitext",
+      "single_choice": "Einzelauswahl",
+      "multiple_choice": "Mehrfachauswahl",
+      "rating": "Bewertung",
+      "date": "Datum",
+      "file": "Datei-Upload",
+      "nps": "Net Promoter Score (1-10)"
+    },
+    "required": "Pflichtfrage",
+    "optional": "Optional",
+    "placeholder": "Platzhalter"
+  },
+  "actions": {
+    "view": "Anzeigen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "duplicate": "Duplizieren",
+    "preview": "Vorschau",
+    "stats": "Statistiken",
+    "export": "Exportieren",
+    "copy": "Kopieren",
+    "copyUrl": "URL kopieren",
+    "download": "Herunterladen"
+  },
+  "messages": {
+    "created": "Umfrage erfolgreich erstellt",
+    "updated": "Umfrage erfolgreich aktualisiert",
+    "deleted": "Umfrage erfolgreich gelöscht",
+    "error": "Ein Fehler ist aufgetreten",
+    "confirm_delete": "Sind Sie sicher, dass Sie diese Umfrage löschen möchten?",
+    "tokenCopied": "Token kopiert",
+    "tokenCopiedDesc": "Token in die Zwischenablage kopiert",
+    "urlCopied": "URL kopiert",
+    "urlCopiedDesc": "Umfrage-URL in die Zwischenablage kopiert"
+  },
+  "form": {
+    "sections": {
+      "basicInfo": "Grundinformationen",
+      "projectDetails": "Projektdetails",
+      "locationInfo": "Standortinformationen",
+      "accessTokens": "Zugangstokens",
+      "multilingualContent": "Mehrsprachiger Inhalt",
+      "endMessages": "Umfrageende-Nachrichten",
+      "expiredMessages": "Abgelaufene Umfrage-Nachrichten",
+      "publicAccessInfo": "Öffentliche Zugangsinformationen"
+    },
+    "fields": {
+      "title": "Titel",
+      "titleWithLanguage": "Titel - {{language}}",
+      "description": "Beschreibung",
+      "descriptionWithLanguage": "Beschreibung - {{language}}",
+      "languages": "Sprachen",
+      "format": "Format",
+      "type": "Typ",
+      "startDateTime": "Startdatum & Uhrzeit",
+      "expiryDate": "Enddatum & Uhrzeit",
+      "isActive": "Aktiv",
+      "city": "Stadt",
+      "country": "Land",
+      "token": "Token",
+      "tokenDescription": "Token-Beschreibung",
+      "publicAccessTokens": "Öffentliche Zugangstokens",
+      "publicAccessTokensHint": "Tokens für den Zugriff auf die Umfrage",
+      "endTitle": "Abschlusstitel",
+      "endTitleWithLanguage": "Abschlusstitel - {{language}}",
+      "endMessage": "Abschlussnachricht",
+      "endMessageWithLanguage": "Abschlussnachricht - {{language}}",
+      "expiredTitle": "Abgelaufener Titel",
+      "expiredTitleWithLanguage": "Abgelaufener Titel - {{language}}",
+      "expiredMessage": "Abgelaufene Nachricht",
+      "expiredMessageWithLanguage": "Abgelaufene Nachricht - {{language}}",
+      "analysisCluster": "Analyse-Cluster"
+    },
+    "placeholders": {
+      "title": "Titel eingeben",
+      "titleWithLanguage": "Titel in {{language}} eingeben",
+      "description": "Beschreibung eingeben",
+      "descriptionWithLanguage": "Beschreibung in {{language}} eingeben",
+      "city": "Stadt eingeben",
+      "country": "Land eingeben",
+      "token": "Token eingeben",
+      "tokenDescription": "Token-Beschreibung eingeben",
+      "endTitle": "Abschlusstitel eingeben",
+      "endTitleWithLanguage": "Abschlusstitel in {{language}} eingeben",
+      "endMessage": "Abschlussnachricht eingeben",
+      "endMessageWithLanguage": "Abschlussnachricht in {{language}} eingeben",
+      "expiredTitle": "Abgelaufenen Titel eingeben",
+      "expiredTitleWithLanguage": "Abgelaufenen Titel in {{language}} eingeben",
+      "expiredMessage": "Abgelaufene Nachricht eingeben",
+      "expiredMessageWithLanguage": "Abgelaufene Nachricht in {{language}} eingeben"
+    },
+    "messages": {
+      "pleaseFixErrors": "Bitte beheben Sie folgende Fehler:",
+      "formUpdated": "Formular erfolgreich aktualisiert",
+      "formUpdateFailed": "Formularaktualisierung fehlgeschlagen",
+      "requiredField": "Dieses Feld ist erforderlich",
+      "invalidDate": "Bitte geben Sie ein gültiges Datum ein",
+      "startBeforeExpiry": "Startdatum muss vor dem Ablaufdatum liegen",
+      "tokenRequired": "Mindestens ein Token ist erforderlich",
+      "tokenFormat": "Token darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten",
+      "duplicateToken": "Token existiert bereits",
+      "qrCodesAvailable": "QR-Codes sind für jeden Token nach dem Speichern der Umfrage verfügbar."
+    },
+    "buttons": {
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "addToken": "Token hinzufügen",
+      "generateToken": "Token generieren",
+      "removeToken": "Entfernen",
+      "addQuestion": "Frage hinzufügen"
+    },
+    "tabs": {
+      "details": "Details",
+      "multilingual": "Mehrsprachig",
+      "questions": "Fragen",
+      "access": "Zugang",
+      "general": "Allgemein",
+      "endMessages": "Ende-Nachrichten",
+      "projectInfo": "Projektinfos"
+    },
+    "options": {
+      "format": {
+        "online": "Online",
+        "faceToFace": "Persönlich"
+      },
+      "type": {
+        "public": "Öffentlich",
+        "friendsFamily": "Freunde und Familie",
+        "professional": "Professionell",
+        "singleCompany": "Einzelnes Unternehmen",
+        "intracompany": "Firmenintern"
+      },
+      "analysisCluster": {
+        "standard": "Standard",
+        "corenetEvent": "CoreNet-Veranstaltung",
+        "eventConference": "Event & Konferenz",
+        "homeOffice": "Heimbüro"
+      }
+    },
+    "actions": {
+      "save": "Speichern",
+      "update": "Aktualisieren",
+      "create": "Erstellen",
+      "cancel": "Abbrechen",
+      "addToken": "Token hinzufügen",
+      "generate": "Generieren",
+      "remove": "Entfernen",
+      "saving": "Speichern..."
+    }
+  }
+} 

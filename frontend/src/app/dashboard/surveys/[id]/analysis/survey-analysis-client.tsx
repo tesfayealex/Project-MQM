@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SentimentChart } from '@/components/analysis/SentimentChart';
@@ -26,6 +26,12 @@ import {
   LineChart,
   Line
 } from 'recharts';
+import { useRouter } from 'next/navigation';
+import { useTranslation } from 'react-i18next';
+import { Skeleton } from '@/components/ui/skeleton';
+import { handleAuthError } from '@/lib/auth-utils';
+import { getCookie } from 'cookies-next';
+import { useLanguage } from '@/contexts/language-context';
 
 // Define interfaces for chart components
 interface LanguageBreakdown {
@@ -202,6 +208,9 @@ interface SurveyAnalysisProps {
 
 export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) {
   const { toast } = useToast();
+  const router = useRouter();
+  const { t, i18n } = useTranslation(['surveys', 'common'], { useSuspense: false });
+  const { locale: currentLanguage } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [summary, setSummary] = useState<SurveyAnalysisSummary | null>(null);
@@ -210,6 +219,21 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
   const [selectedLanguage, setSelectedLanguage] = useState<string>('en');
   const [wordCloudMode, setWordCloudMode] = useState<'words' | 'clusters'>('words');
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Load translations
+    i18n.loadNamespaces(['surveys', 'common']).catch(err => 
+      console.error('Failed to load namespaces:', err)
+    );
+  }, [i18n]);
+
+  useEffect(() => {
+    // Update selected language when global language changes
+    if (currentLanguage && summary?.language_breakdown?.[currentLanguage]) {
+      setSelectedLanguage(currentLanguage);
+    }
+  }, [currentLanguage, summary]);
 
   useEffect(() => {
     loadAnalysisData();
@@ -251,6 +275,8 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
         description: error.message || "Failed to load survey analysis",
         variant: "destructive"
       });
+      handleAuthError(error);
+      setError(t('errors.analysisLoadFailed'));
     } finally {
       setLoading(false);
     }
@@ -305,6 +331,8 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
         description: error.message || "Failed to analyze survey responses",
         variant: "destructive"
       });
+      handleAuthError(error);
+      setError(t('errors.analysisFailed'));
     } finally {
       setAnalyzing(false);
     }
@@ -346,6 +374,8 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
         description: error.message || "Failed to process survey responses",
         variant: "destructive"
       });
+      handleAuthError(error);
+      setError(t('errors.processingFailed'));
     } finally {
       setProcessing(false);
     }
@@ -353,9 +383,30 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-64 w-full" />
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center py-10">
+            <h3 className="text-lg font-medium text-gray-900 mb-2">{t('errors.error')}</h3>
+            <p className="text-gray-500">{error}</p>
+            <Button 
+              className="mt-4" 
+              onClick={() => router.push('/dashboard/surveys')}
+            >
+              {t('actions.backToSurveys')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -578,7 +629,7 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
                     <tr>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cluster Name</th>
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Freq.</th>
-                      <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment</th>
+                      {/* <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Sentiment</th> */}
                       <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">NPS</th>
                     </tr>
                   </thead>
@@ -593,7 +644,7 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
                           }`}>{index + 1}</span> {cluster.name}
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-sm text-right">{cluster.frequency}</td>
-                        <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
+                        {/* <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
                           <span className={
                             cluster.sentiment_score > 0 ? "text-green-600" :
                             cluster.sentiment_score < 0 ? "text-red-600" :
@@ -601,7 +652,7 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
                           }>
                             {cluster.sentiment_score.toFixed(2)}
                           </span>
-                        </td>
+                        </td> */}
                         <td className="px-3 py-2 whitespace-nowrap text-sm text-right">
                           {cluster.nps_score !== null ? 
                             <span className={

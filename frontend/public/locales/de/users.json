@@ -1,0 +1,83 @@
+{
+  "list": {
+    "title": "Benutzer",
+    "description": "Systembenutzer und Berechtigungen verwalten",
+    "create": "Benutzer erstellen",
+    "columns": {
+      "name": "Name",
+      "email": "E-Mail",
+      "role": "Rolle",
+      "status": "Status",
+      "lastLogin": "Letzter Login",
+      "actions": "Aktionen"
+    },
+    "status": {
+      "active": "Aktiv",
+      "inactive": "Inaktiv",
+      "suspended": "Gesperrt"
+    },
+    "empty": "Keine Benutzer gefunden",
+    "loading": "Benutzer werden geladen..."
+  },
+  "detail": {
+    "title": "Benutzerdetails",
+    "edit": "Benutzer bearbeiten",
+    "delete": "Benutzer löschen",
+    "back": "Zurück zu Benutzern",
+    "profile": "Profil",
+    "personal": "Persönliche Informationen",
+    "permissions": "Berechtigungen",
+    "activity": "Aktivitätsprotokoll"
+  },
+  "create": {
+    "title": "Benutzer erstellen",
+    "description": "Einen neuen Benutzer zum System hinzufügen",
+    "success": "Benutzer erfolgreich erstellt"
+  },
+  "edit": {
+    "title": "Benutzer bearbeiten",
+    "description": "Benutzerinformationen und Berechtigungen ändern",
+    "success": "Benutzer erfolgreich aktualisiert"
+  },
+  "fields": {
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "confirmPassword": "Passwort bestätigen",
+    "role": "Rolle",
+    "department": "Abteilung",
+    "phone": "Telefonnummer",
+    "status": "Status",
+    "permissions": "Berechtigungen"
+  },
+  "roles": {
+    "admin": "Administrator",
+    "moderator": "Moderator",
+    "organizer": "Organisator",
+    "user": "Regulärer Benutzer"
+  },
+  "buttons": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "resetPassword": "Passwort zurücksetzen",
+    "suspend": "Konto sperren",
+    "activate": "Konto aktivieren"
+  },
+  "messages": {
+    "confirmDelete": "Sind Sie sicher, dass Sie diesen Benutzer löschen möchten?",
+    "confirmSuspend": "Sind Sie sicher, dass Sie diesen Benutzer sperren möchten?",
+    "deleted": "Benutzer erfolgreich gelöscht",
+    "error": "Ein Fehler ist aufgetreten",
+    "permissionsUpdated": "Berechtigungen erfolgreich aktualisiert"
+  },
+  "activity": {
+    "loginTime": "Anmeldezeit",
+    "logoutTime": "Abmeldezeit",
+    "ipAddress": "IP-Adresse",
+    "device": "Gerät",
+    "action": "Aktion",
+    "empty": "Keine Aktivitäten aufgezeichnet"
+  }
+} 

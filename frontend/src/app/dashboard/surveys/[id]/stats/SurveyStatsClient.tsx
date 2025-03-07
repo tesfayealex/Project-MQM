@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/tooltip"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { useTranslation } from 'react-i18next';
 
 interface Response {
   id: string;
@@ -66,6 +67,7 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
+  const { t, i18n } = useTranslation('surveys', { useSuspense: false });
   
   // Get surveyId from props or from route params
   const surveyId = propsSurveyId || (params?.id as string);
@@ -174,6 +176,13 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
     
     loadAvailableClusters();
   }, []);
+
+  // Make sure the surveys namespace is loaded
+  useEffect(() => {
+    i18n.loadNamespaces('surveys').catch(err => 
+      console.error('Failed to load surveys namespace:', err)
+    );
+  }, [i18n]);
 
   // Function to handle cluster update
   const handleUpdateCluster = async (wordId: number, clusterId: number, wordIndex: number, responseId: string, newCluster: string) => {

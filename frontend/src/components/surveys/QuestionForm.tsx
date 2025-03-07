@@ -9,6 +9,21 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
+
+// Define the language type
+interface Language {
+  code: string;
+  name: string;
+}
+
+// Available languages - define locally to avoid import issues
+const AVAILABLE_LANGUAGES: Language[] = [
+  { code: 'en', name: 'English' },
+  { code: 'de', name: 'German' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'fr', name: 'French' },
+];
 
 // Define the schema (must match the parent form's schema)
 const questionSchema = z.object({
@@ -27,6 +42,7 @@ type QuestionFormValues = {
 };
 
 export default function QuestionForm({ languages }: { languages: string[] }) {
+  const { t } = useTranslation('surveys');
   const { control, register, getValues, setValue, watch, formState } = useFormContext<QuestionFormValues>();
   const { fields, append, remove, move } = useFieldArray({
     control,
@@ -76,7 +92,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Survey Questions</h3>
+        <h3 className="text-lg font-medium">{t('questions.title')}</h3>
         <Button 
           type="button" 
           onClick={addQuestion}
@@ -84,13 +100,13 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
           size="sm"
         >
           <PlusIcon className="w-4 h-4 mr-2" />
-          Add Question
+          {t('questions.add')}
         </Button>
       </div>
 
       {fields.length === 0 ? (
         <div className="py-4 text-center text-gray-500">
-          No questions yet. Add your first question to get started.
+          {t('questions.empty')}
         </div>
       ) : (
         fields.map((field, index) => (
@@ -98,7 +114,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
                 <CardTitle className="text-base">
-                  Question {index + 1}
+                  {t('questions.questionNumber', { number: index + 1 })}
                 </CardTitle>
                 <div className="flex gap-2">
                   <Button
@@ -107,6 +123,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
                     size="sm"
                     onClick={() => index > 0 && move(index, index - 1)}
                     disabled={index === 0}
+                    aria-label={t('questions.moveUp')}
                   >
                     ↑
                   </Button>
@@ -116,6 +133,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
                     size="sm"
                     onClick={() => index < fields.length - 1 && move(index, index + 1)}
                     disabled={index === fields.length - 1}
+                    aria-label={t('questions.moveDown')}
                   >
                     ↓
                   </Button>
@@ -125,6 +143,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
                     size="sm"
                     className="text-red-500 hover:text-red-700"
                     onClick={() => remove(index)}
+                    aria-label={t('questions.remove')}
                   >
                     <TrashIcon className="w-4 h-4" />
                   </Button>
@@ -134,17 +153,17 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor={`questions.${index}.type`}>Question Type</Label>
+                  <Label htmlFor={`questions.${index}.type`}>{t('questions.type')}</Label>
                   <Select
                     value={watch(`questions.${index}.type`)}
                     onValueChange={(value) => setValue(`questions.${index}.type`, value as 'nps' | 'free_text')}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select question type" />
+                      <SelectValue placeholder={t('questions.selectType')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="nps">Net Promoter Score (1-10)</SelectItem>
-                      <SelectItem value="free_text">Free Text</SelectItem>
+                      <SelectItem value="nps">{t('questions.types.nps')}</SelectItem>
+                      <SelectItem value="free_text">{t('questions.types.text')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -154,7 +173,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
                     checked={watch(`questions.${index}.is_required`)}
                     onCheckedChange={(checked) => setValue(`questions.${index}.is_required`, checked)}
                   />
-                  <Label htmlFor={`questions.${index}.is_required`}>Required question</Label>
+                  <Label htmlFor={`questions.${index}.is_required`}>{t('questions.required')}</Label>
                 </div>
               </div>
 
@@ -162,14 +181,18 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
               {languages.map(lang => (
                 <div key={`${field.id}-${lang}`} className="space-y-2">
                   <Label htmlFor={`questions.${index}.questions.${lang}`}>
-                    Question Text - {lang.toUpperCase()}
+                    {t('questions.textWithLanguage', { 
+                      language: AVAILABLE_LANGUAGES.find((l) => l.code === lang)?.name || lang.toUpperCase() 
+                    })}
                   </Label>
                   <Textarea
                     id={`questions.${index}.questions.${lang}`}
                     {...register(`questions.${index}.questions.${lang}`, {
                       required: true
                     })}
-                    placeholder={`Enter question in ${lang.toUpperCase()}`}
+                    placeholder={t('questions.textPlaceholder', { 
+                      language: AVAILABLE_LANGUAGES.find((l) => l.code === lang)?.name || lang.toUpperCase() 
+                    })}
                     className="min-h-[80px]"
                   />
                 </div>
@@ -179,12 +202,16 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
               {languages.map(lang => (
                 <div key={`${field.id}-${lang}-placeholder`} className="space-y-2">
                   <Label htmlFor={`questions.${index}.placeholders.${lang}`}>
-                    Placeholder - {lang.toUpperCase()}
+                    {t('questions.placeholderWithLanguage', { 
+                      language: AVAILABLE_LANGUAGES.find((l) => l.code === lang)?.name || lang.toUpperCase() 
+                    })}
                   </Label>
                   <Textarea
                     id={`questions.${index}.placeholders.${lang}`}
                     {...register(`questions.${index}.placeholders.${lang}`)}
-                    placeholder={`Enter placeholder in ${lang.toUpperCase()}`}
+                    placeholder={t('questions.placeholderInputText', { 
+                      language: AVAILABLE_LANGUAGES.find((l) => l.code === lang)?.name || lang.toUpperCase() 
+                    })}
                     className="min-h-[80px]"
                   />
                 </div>
@@ -209,7 +236,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
             variant="outline"
           >
             <PlusIcon className="w-4 h-4 mr-2" />
-            Add Another Question
+            {t('questions.addAnother')}
           </Button>
         </div>
       )}

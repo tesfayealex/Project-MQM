@@ -1,0 +1,105 @@
+{
+  "general": {
+    "title": "Settings",
+    "description": "Configure application settings and preferences",
+    "save": "Save Changes",
+    "reset": "Reset to Defaults",
+    "saved": "Settings saved successfully",
+    "error": "Failed to save settings"
+  },
+  "navigation": {
+    "general": "General",
+    "account": "Account",
+    "appearance": "Appearance",
+    "notifications": "Notifications",
+    "privacy": "Privacy & Security",
+    "language": "Language",
+    "advanced": "Advanced"
+  },
+  "account": {
+    "title": "Account Settings",
+    "profileInfo": "Profile Information",
+    "changePassword": "Change Password",
+    "twoFactor": "Two-Factor Authentication",
+    "connectedAccounts": "Connected Accounts",
+    "deleteAccount": "Delete Account",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm New Password",
+    "passwordChanged": "Password changed successfully",
+    "confirmDelete": "Are you sure you want to delete your account? This action cannot be undone."
+  },
+  "appearance": {
+    "title": "Appearance Settings",
+    "theme": "Theme",
+    "themes": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System Default"
+    },
+    "fontSize": "Font Size",
+    "fontSizes": {
+      "small": "Small",
+      "medium": "Medium",
+      "large": "Large"
+    },
+    "compactMode": "Compact Mode",
+    "enableAnimations": "Enable Animations"
+  },
+  "notifications": {
+    "title": "Notification Settings",
+    "email": "Email Notifications",
+    "push": "Push Notifications",
+    "inApp": "In-App Notifications",
+    "types": {
+      "surveys": "Surveys and Responses",
+      "messages": "Messages",
+      "updates": "System Updates",
+      "reminders": "Reminders"
+    },
+    "frequency": "Notification Frequency",
+    "frequencies": {
+      "immediately": "Immediately",
+      "daily": "Daily Digest",
+      "weekly": "Weekly Summary"
+    }
+  },
+  "privacy": {
+    "title": "Privacy & Security",
+    "dataSharing": "Data Sharing",
+    "cookieSettings": "Cookie Settings",
+    "thirdPartyAccess": "Third-Party Access",
+    "sessionManagement": "Session Management",
+    "activeSessions": "Active Sessions",
+    "endAllSessions": "End All Other Sessions",
+    "sessionEnded": "All other sessions have been terminated"
+  },
+  "language": {
+    "title": "Language Settings",
+    "appLanguage": "Application Language",
+    "contentLanguage": "Content Language",
+    "languages": {
+      "en": "English",
+      "fr": "French",
+      "es": "Spanish",
+      "de": "German"
+    },
+    "dateFormat": "Date Format",
+    "timeFormat": "Time Format",
+    "timeFormats": {
+      "12h": "12-hour (AM/PM)",
+      "24h": "24-hour"
+    }
+  },
+  "advanced": {
+    "title": "Advanced Settings",
+    "apiAccess": "API Access",
+    "developerMode": "Developer Mode",
+    "exportData": "Export Data",
+    "importData": "Import Data",
+    "clearCache": "Clear Application Cache",
+    "cacheCleared": "Application cache cleared successfully",
+    "debugMode": "Debug Mode",
+    "warning": "Warning: These settings are intended for advanced users only."
+  }
+} 

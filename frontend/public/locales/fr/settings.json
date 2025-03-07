@@ -1,0 +1,105 @@
+{
+  "general": {
+    "title": "Paramètres",
+    "description": "Configurer les paramètres et préférences de l'application",
+    "save": "Enregistrer les modifications",
+    "reset": "Réinitialiser aux valeurs par défaut",
+    "saved": "Paramètres enregistrés avec succès",
+    "error": "Échec de l'enregistrement des paramètres"
+  },
+  "navigation": {
+    "general": "Général",
+    "account": "Compte",
+    "appearance": "Apparence",
+    "notifications": "Notifications",
+    "privacy": "Confidentialité & Sécurité",
+    "language": "Langue",
+    "advanced": "Avancé"
+  },
+  "account": {
+    "title": "Paramètres du compte",
+    "profileInfo": "Informations du profil",
+    "changePassword": "Changer le mot de passe",
+    "twoFactor": "Authentification à deux facteurs",
+    "connectedAccounts": "Comptes connectés",
+    "deleteAccount": "Supprimer le compte",
+    "currentPassword": "Mot de passe actuel",
+    "newPassword": "Nouveau mot de passe",
+    "confirmPassword": "Confirmer le nouveau mot de passe",
+    "passwordChanged": "Mot de passe modifié avec succès",
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible."
+  },
+  "appearance": {
+    "title": "Paramètres d'apparence",
+    "theme": "Thème",
+    "themes": {
+      "light": "Clair",
+      "dark": "Sombre",
+      "system": "Par défaut du système"
+    },
+    "fontSize": "Taille de police",
+    "fontSizes": {
+      "small": "Petite",
+      "medium": "Moyenne",
+      "large": "Grande"
+    },
+    "compactMode": "Mode compact",
+    "enableAnimations": "Activer les animations"
+  },
+  "notifications": {
+    "title": "Paramètres de notification",
+    "email": "Notifications par e-mail",
+    "push": "Notifications push",
+    "inApp": "Notifications dans l'application",
+    "types": {
+      "surveys": "Enquêtes et réponses",
+      "messages": "Messages",
+      "updates": "Mises à jour système",
+      "reminders": "Rappels"
+    },
+    "frequency": "Fréquence des notifications",
+    "frequencies": {
+      "immediately": "Immédiatement",
+      "daily": "Résumé quotidien",
+      "weekly": "Résumé hebdomadaire"
+    }
+  },
+  "privacy": {
+    "title": "Confidentialité & Sécurité",
+    "dataSharing": "Partage de données",
+    "cookieSettings": "Paramètres des cookies",
+    "thirdPartyAccess": "Accès tiers",
+    "sessionManagement": "Gestion des sessions",
+    "activeSessions": "Sessions actives",
+    "endAllSessions": "Terminer toutes les autres sessions",
+    "sessionEnded": "Toutes les autres sessions ont été terminées"
+  },
+  "language": {
+    "title": "Paramètres de langue",
+    "appLanguage": "Langue de l'application",
+    "contentLanguage": "Langue du contenu",
+    "languages": {
+      "en": "Anglais",
+      "fr": "Français",
+      "es": "Espagnol",
+      "de": "Allemand"
+    },
+    "dateFormat": "Format de date",
+    "timeFormat": "Format d'heure",
+    "timeFormats": {
+      "12h": "12 heures (AM/PM)",
+      "24h": "24 heures"
+    }
+  },
+  "advanced": {
+    "title": "Paramètres avancés",
+    "apiAccess": "Accès API",
+    "developerMode": "Mode développeur",
+    "exportData": "Exporter les données",
+    "importData": "Importer les données",
+    "clearCache": "Vider le cache de l'application",
+    "cacheCleared": "Cache de l'application vidé avec succès",
+    "debugMode": "Mode débogage",
+    "warning": "Attention : Ces paramètres sont destinés uniquement aux utilisateurs avancés."
+  }
+} 

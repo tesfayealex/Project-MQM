@@ -1,0 +1,268 @@
+{
+  "list": {
+    "title": "Sondages",
+    "description": "Créez et gérez vos sondages",
+    "create": "Créer un sondage",
+    "columns": {
+      "name": "Nom",
+      "status": "Statut",
+      "responses": "Réponses",
+      "created": "Créé",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "draft": "Brouillon",
+      "completed": "Terminé",
+      "archived": "Archivé",
+      "inactive": "Inactif"
+    },
+    "empty": "Aucun sondage trouvé",
+    "loading": "Chargement des sondages..."
+  },
+  "detail": {
+    "view": "Voir le sondage",
+    "edit": "Modifier le sondage",
+    "delete": "Supprimer le sondage",
+    "stats": "Statistiques du sondage",
+    "analysis": "Analyse des réponses",
+    "responses": "Total des réponses",
+    "created": "Créé le",
+    "updated": "Dernière mise à jour le",
+    "status": "Statut",
+    "back": "Retour aux sondages",
+    "share": "Partager le sondage",
+    "send": "Envoyer par email",
+    "basicInfo": "Informations de base",
+    "noDescription": "Pas de description",
+    "languages": "Langues",
+    "questions": "Questions",
+    "questionsCount": "Questions",
+    "question": "Question",
+    "untitledQuestion": "Question sans titre",
+    "projectDetails": "Détails du projet",
+    "buildingName": "Nom du bâtiment",
+    "shortId": "ID court",
+    "projectDescription": "Description du projet",
+    "token": "Jeton",
+    "publicAccess": "Accès public",
+    "available": "Disponible",
+    "qrUnavailable": "Code QR indisponible",
+    "qrUnavailableDesc": "Les données du code QR sont indisponibles",
+    "publicSurveyLink": "Lien d'enquête public",
+    "qrCode": "Code QR",
+    "qrCodeAlt": "Code QR pour l'enquête"
+  },
+  "create": {
+    "title": "Créer un sondage",
+    "description": "Créer un nouveau formulaire de sondage",
+    "survey_name": "Nom du sondage",
+    "survey_description": "Description du sondage",
+    "add_question": "Ajouter une question",
+    "save_draft": "Enregistrer le brouillon",
+    "publish": "Publier le sondage",
+    "cancel": "Annuler"
+  },
+  "edit": {
+    "title": "Modifier le sondage",
+    "description": "Modifier votre sondage existant",
+    "save_changes": "Enregistrer les modifications"
+  },
+  "stats": {
+    "title": "Statistiques du sondage",
+    "description": "Voir les statistiques de réponse pour votre sondage",
+    "total": "Total des réponses",
+    "completion_rate": "Taux d'achèvement",
+    "avg_time": "Temps moyen d'achèvement",
+    "charts": {
+      "responses": "Nombre de réponses",
+      "daily": "Réponses quotidiennes",
+      "devices": "Utilisation des appareils",
+      "locations": "Emplacements des réponses"
+    }
+  },
+  "analysis": {
+    "title": "Analyse des réponses",
+    "description": "Analyser les tendances et les insights des réponses",
+    "overview": "Aperçu des réponses",
+    "sentiment": "Analyse des sentiments",
+    "word_cloud": "Nuage de mots",
+    "key_topics": "Sujets clés",
+    "explore": "Explorer les réponses"
+  },
+  "questions": {
+    "types": {
+      "text": "Texte Libre",
+      "single_choice": "Choix unique",
+      "multiple_choice": "Choix multiple",
+      "rating": "Évaluation",
+      "date": "Date",
+      "file": "Téléchargement de fichier",
+      "nps": "Net Promoter Score (1-10)"
+    },
+    "required": "Question obligatoire",
+    "optional": "Facultatif",
+    "placeholder": "Placeholder",
+    "title": "Questions du Sondage",
+    "add": "Ajouter une Question",
+    "addAnother": "Ajouter une Autre Question",
+    "empty": "Pas encore de questions. Ajoutez votre première question pour commencer.",
+    "questionNumber": "Question {{number}}",
+    "moveUp": "Déplacer vers le Haut",
+    "moveDown": "Déplacer vers le Bas",
+    "remove": "Supprimer la Question",
+    "type": "Type de Question",
+    "selectType": "Sélectionner le type de question",
+    "textWithLanguage": "Texte de la Question - {{language}}",
+    "textPlaceholder": "Saisissez la question en {{language}}",
+    "placeholderWithLanguage": "Placeholder - {{language}}",
+    "placeholderInputText": "Saisissez le placeholder en {{language}}"
+  },
+  "actions": {
+    "view": "Voir",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "duplicate": "Dupliquer",
+    "preview": "Aperçu",
+    "stats": "Stats",
+    "export": "Exporter",
+    "copy": "Copier",
+    "copyUrl": "Copier l'URL",
+    "download": "Télécharger"
+  },
+  "messages": {
+    "created": "Sondage créé avec succès",
+    "updated": "Sondage mis à jour avec succès",
+    "deleted": "Sondage supprimé avec succès",
+    "error": "Une erreur s'est produite",
+    "confirm_delete": "Êtes-vous sûr de vouloir supprimer ce sondage ?",
+    "tokenCopied": "Jeton copié",
+    "tokenCopiedDesc": "Jeton copié dans le presse-papiers",
+    "urlCopied": "URL copiée",
+    "urlCopiedDesc": "URL de l'enquête copiée dans le presse-papiers"
+  },
+  "form": {
+    "sections": {
+      "basicInfo": "Informations de Base",
+      "projectDetails": "Détails du Projet",
+      "locationInfo": "Informations de Localisation",
+      "accessTokens": "Tokens d'Accès",
+      "multilingualContent": "Contenu Multilingue",
+      "startMessages": "Messages de Début de Sondage",
+      "endMessages": "Messages de Fin de Sondage",
+      "expiredMessages": "Messages de Sondage Expiré",
+      "publicAccessInfo": "Informations d'Accès Public"
+    },
+    "fields": {
+      "title": "Titre",
+      "titleWithLanguage": "Titre - {{language}}",
+      "description": "Description",
+      "descriptionWithLanguage": "Description - {{language}}",
+      "languages": "Langues",
+      "format": "Format",
+      "type": "Type",
+      "startDateTime": "Date et Heure de Début",
+      "expiryDate": "Date et Heure de Fin",
+      "isActive": "Actif",
+      "city": "Ville",
+      "country": "Pays",
+      "token": "Token",
+      "tokenDescription": "Description du Token",
+      "publicAccessTokens": "Tokens d'Accès Public",
+      "publicAccessTokensHint": "Tokens utilisés pour accéder au sondage",
+      "startTitle": "Titre de Début",
+      "startTitleWithLanguage": "Titre de Début - {{language}}",
+      "startMessage": "Message de Début",
+      "startMessageWithLanguage": "Message de Début - {{language}}",
+      "endTitle": "Titre de Fin",
+      "endTitleWithLanguage": "Titre de Fin - {{language}}",
+      "endMessage": "Message de Fin",
+      "endMessageWithLanguage": "Message de Fin - {{language}}",
+      "expiredTitle": "Titre Expiré",
+      "expiredTitleWithLanguage": "Titre Expiré - {{language}}",
+      "expiredMessage": "Message Expiré",
+      "expiredMessageWithLanguage": "Message Expiré - {{language}}",
+      "analysisCluster": "Cluster d'Analyse"
+    },
+    "placeholders": {
+      "title": "Entrez le titre",
+      "titleWithLanguage": "Entrez le titre en {{language}}",
+      "description": "Entrez la description",
+      "descriptionWithLanguage": "Entrez la description en {{language}}",
+      "city": "Entrez la ville",
+      "country": "Entrez le pays",
+      "token": "Entrez le token",
+      "tokenDescription": "Entrez la description du token",
+      "startTitle": "Entrez le titre de début",
+      "startTitleWithLanguage": "Entrez le titre de début en {{language}}",
+      "startMessage": "Entrez le message de début",
+      "startMessageWithLanguage": "Entrez le message de début en {{language}}",
+      "endTitle": "Entrez le titre de fin",
+      "endTitleWithLanguage": "Entrez le titre de fin en {{language}}",
+      "endMessage": "Entrez le message de fin",
+      "endMessageWithLanguage": "Entrez le message de fin en {{language}}",
+      "expiredTitle": "Entrez le titre expiré",
+      "expiredTitleWithLanguage": "Entrez le titre expiré en {{language}}",
+      "expiredMessage": "Entrez le message expiré",
+      "expiredMessageWithLanguage": "Entrez le message expiré en {{language}}"
+    },
+    "messages": {
+      "pleaseFixErrors": "Veuillez corriger les erreurs suivantes :",
+      "formUpdated": "Formulaire mis à jour avec succès",
+      "formUpdateFailed": "Échec de la mise à jour du formulaire",
+      "requiredField": "Ce champ est obligatoire",
+      "invalidDate": "Veuillez entrer une date valide",
+      "startBeforeExpiry": "La date de début doit être antérieure à la date d'expiration",
+      "tokenRequired": "Au moins un token est requis",
+      "tokenFormat": "Le token ne peut contenir que des lettres minuscules, des chiffres et des tirets",
+      "duplicateToken": "Ce token existe déjà",
+      "qrCodesAvailable": "Les codes QR sont disponibles pour chaque token après avoir enregistré le sondage."
+    },
+    "buttons": {
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "addToken": "Ajouter un Token",
+      "generateToken": "Générer un Token",
+      "removeToken": "Supprimer",
+      "addQuestion": "Ajouter une Question"
+    },
+    "tabs": {
+      "details": "Détails",
+      "multilingual": "Multilingue",
+      "questions": "Questions",
+      "access": "Accès",
+      "general": "Général",
+      "endMessages": "Messages de Fin",
+      "projectInfo": "Infos du Projet"
+    },
+    "options": {
+      "format": {
+        "online": "En ligne",
+        "faceToFace": "En personne"
+      },
+      "type": {
+        "public": "Public",
+        "friendsFamily": "Amis et Famille",
+        "professional": "Professionnel",
+        "singleCompany": "Entreprise Unique",
+        "intracompany": "Intra-entreprise"
+      },
+      "analysisCluster": {
+        "standard": "Standard",
+        "corenetEvent": "Événement CoreNet",
+        "eventConference": "Événement et Conférence",
+        "homeOffice": "Bureau à Domicile"
+      }
+    },
+    "actions": {
+      "save": "Enregistrer",
+      "update": "Mettre à jour",
+      "create": "Créer",
+      "cancel": "Annuler",
+      "addToken": "Ajouter un Token",
+      "generate": "Générer",
+      "remove": "Supprimer",
+      "saving": "Enregistrement..."
+    }
+  }
+}

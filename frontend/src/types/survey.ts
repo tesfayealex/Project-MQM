@@ -16,8 +16,6 @@ export interface SurveyToken {
   token: string;
   description: string;
   created_at?: string;
-  survey_url?: string;
-  qr_code_url?: string;
 }
 
 export interface Survey {
@@ -33,10 +31,15 @@ export interface Survey {
   languages: string[];
   format?: string;
   type?: string;
-  max_participants?: number;
-  end_date?: string;
-  analysis_end_date?: string;
+  start_datetime?: string;
+  expiry_date?: string;
   analysis_cluster?: string;
+  
+  // Start Survey Information
+  start_survey_title?: string;
+  start_survey_text?: string;
+  start_survey_titles?: Record<string, string>; // Multilingual start titles
+  start_survey_texts?: Record<string, string>; // Multilingual start texts
   
   // End Survey Information
   end_survey_title?: string;
@@ -48,14 +51,7 @@ export interface Survey {
   expired_survey_titles?: Record<string, string>; // Multilingual expired titles
   expired_survey_texts?: Record<string, string>; // Multilingual expired texts
   
-  // Project Information
-  building_name?: string;
-  project_name?: string;
-  project_description?: string;
-  
   // Project Address
-  street?: string;
-  postal_code?: string;
   city?: string;
   country?: string;
   
@@ -70,10 +66,6 @@ export interface Survey {
   response_count?: number;
   
   // Additional fields
-  expiry_date?: string | Date;
-  short_id?: string;
-  street_number?: string;
-  city_code?: string;
   created_by?: number;
   status?: 'active' | 'expired' | 'inactive' | 'full';
 }

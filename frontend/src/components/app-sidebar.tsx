@@ -4,6 +4,7 @@ import { BarChart, ClipboardList, Home, LogOut, Settings, Users } from "lucide-r
 import { signOut, useSession } from "next-auth/react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useTranslation } from 'react-i18next'
 
 import {
   Sidebar,
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { LanguageSelector } from "@/components/language-selector"
 
 interface User {
   name?: string | null
@@ -35,31 +37,31 @@ interface User {
 // Menu items with role-based access
 const items = [
   {
-    title: "Dashboard",
+    titleKey: "sidebar.dashboard",
     url: "/dashboard",
     icon: Home,
     roles: ["Admin", "Organizer", "Moderator"],
   },
   {
-    title: "Surveys",
+    titleKey: "sidebar.surveys",
     url: "/dashboard/surveys",
     icon: ClipboardList,
     roles: ["Admin", "Organizer", "Moderator"],
   },
+  // {
+  //   titleKey: "sidebar.analytics",
+  //   url: "/dashboard/analytics",
+  //   icon: BarChart,
+  //   roles: ["Admin", "Organizer", "Moderator"],
+  // },
   {
-    title: "Analytics",
-    url: "/dashboard/analytics",
-    icon: BarChart,
-    roles: ["Admin", "Organizer", "Moderator"],
-  },
-  {
-    title: "Users",
+    titleKey: "sidebar.users",
     url: "/dashboard/users",
     icon: Users,
     roles: ["Admin", "Organizer"],
   },
   {
-    title: "Settings",
+    titleKey: "sidebar.settings",
     url: "/dashboard/settings",
     icon: Settings,
     roles: ["Admin", "Organizer", "Moderator"],
@@ -68,6 +70,7 @@ const items = [
 
 export function AppSidebar() {
   const { data: session, status } = useSession()
+  const { t } = useTranslation('common')
   const userGroups = session?.user?.groups || []
   const userRoles = userGroups.map(group => group.name)
   const pathname = usePathname()
@@ -83,7 +86,7 @@ export function AppSidebar() {
               <div className="flex min-w-0 items-center gap-2">
                 <ClipboardList className="h-5 w-5 shrink-0" />
                 <span className="overflow-hidden text-lg font-semibold transition-all duration-300 group-[[data-state=collapsed]]:w-0 group-[[data-state=collapsed]]:opacity-0">
-                  myQuickMessage
+                  {t('app.name')}
                 </span>
               </div>
               <SidebarTrigger className="h-8 w-8 p-0 shrink-0" />
@@ -142,7 +145,7 @@ export function AppSidebar() {
                 "overflow-hidden text-lg font-semibold transition-all duration-300",
                 state === "collapsed" && "w-0 opacity-0"
               )}>
-                myQuickMessage
+                {t('app.name')}
               </span>
             </div>
             <SidebarTrigger className="h-8 w-8 p-0 shrink-0" />
@@ -151,7 +154,7 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               {filteredItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
+                <SidebarMenuItem key={item.titleKey}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Link href={item.url} passHref legacyBehavior>
@@ -167,14 +170,14 @@ export function AppSidebar() {
                             "overflow-hidden transition-all duration-300",
                             state === "collapsed" && "w-0 opacity-0"
                           )}>
-                            {item.title}
+                            {t(item.titleKey)}
                           </span>
                         </SidebarMenuButton>
                       </Link>
                     </TooltipTrigger>
                     {state === "collapsed" && (
                       <TooltipContent side="right" align="center">
-                        {item.title}
+                        {t(item.titleKey)}
                       </TooltipContent>
                     )}
                   </Tooltip>
@@ -185,6 +188,7 @@ export function AppSidebar() {
         </SidebarGroup>
         
         <SidebarFooter className="mt-auto">
+          <LanguageSelector />
           <SidebarSeparator />
           <SidebarMenu>
             <SidebarMenuItem>
@@ -202,13 +206,13 @@ export function AppSidebar() {
                       "overflow-hidden transition-all duration-300",
                       state === "collapsed" && "w-0 opacity-0"
                     )}>
-                      Logout
+                      {t('sidebar.logout')}
                     </span>
                   </SidebarMenuButton>
                 </TooltipTrigger>
                 {state === "collapsed" && (
                   <TooltipContent side="right" align="center">
-                    Logout
+                    {t('sidebar.logout')}
                   </TooltipContent>
                 )}
               </Tooltip>

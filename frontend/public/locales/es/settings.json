@@ -1,0 +1,105 @@
+{
+  "general": {
+    "title": "Configuración",
+    "description": "Configurar ajustes y preferencias de la aplicación",
+    "save": "Guardar cambios",
+    "reset": "Restablecer valores predeterminados",
+    "saved": "Configuración guardada correctamente",
+    "error": "Error al guardar la configuración"
+  },
+  "navigation": {
+    "general": "General",
+    "account": "Cuenta",
+    "appearance": "Apariencia",
+    "notifications": "Notificaciones",
+    "privacy": "Privacidad y Seguridad",
+    "language": "Idioma",
+    "advanced": "Avanzado"
+  },
+  "account": {
+    "title": "Configuración de cuenta",
+    "profileInfo": "Información de perfil",
+    "changePassword": "Cambiar contraseña",
+    "twoFactor": "Autenticación de dos factores",
+    "connectedAccounts": "Cuentas conectadas",
+    "deleteAccount": "Eliminar cuenta",
+    "currentPassword": "Contraseña actual",
+    "newPassword": "Nueva contraseña",
+    "confirmPassword": "Confirmar nueva contraseña",
+    "passwordChanged": "Contraseña cambiada correctamente",
+    "confirmDelete": "¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer."
+  },
+  "appearance": {
+    "title": "Configuración de apariencia",
+    "theme": "Tema",
+    "themes": {
+      "light": "Claro",
+      "dark": "Oscuro",
+      "system": "Predeterminado del sistema"
+    },
+    "fontSize": "Tamaño de fuente",
+    "fontSizes": {
+      "small": "Pequeño",
+      "medium": "Mediano",
+      "large": "Grande"
+    },
+    "compactMode": "Modo compacto",
+    "enableAnimations": "Habilitar animaciones"
+  },
+  "notifications": {
+    "title": "Configuración de notificaciones",
+    "email": "Notificaciones por correo electrónico",
+    "push": "Notificaciones push",
+    "inApp": "Notificaciones en la aplicación",
+    "types": {
+      "surveys": "Encuestas y respuestas",
+      "messages": "Mensajes",
+      "updates": "Actualizaciones del sistema",
+      "reminders": "Recordatorios"
+    },
+    "frequency": "Frecuencia de notificaciones",
+    "frequencies": {
+      "immediately": "Inmediatamente",
+      "daily": "Resumen diario",
+      "weekly": "Resumen semanal"
+    }
+  },
+  "privacy": {
+    "title": "Privacidad y Seguridad",
+    "dataSharing": "Compartir datos",
+    "cookieSettings": "Configuración de cookies",
+    "thirdPartyAccess": "Acceso de terceros",
+    "sessionManagement": "Gestión de sesiones",
+    "activeSessions": "Sesiones activas",
+    "endAllSessions": "Finalizar todas las demás sesiones",
+    "sessionEnded": "Todas las demás sesiones han sido terminadas"
+  },
+  "language": {
+    "title": "Configuración de idioma",
+    "appLanguage": "Idioma de la aplicación",
+    "contentLanguage": "Idioma del contenido",
+    "languages": {
+      "en": "Inglés",
+      "fr": "Francés",
+      "es": "Español",
+      "de": "Alemán"
+    },
+    "dateFormat": "Formato de fecha",
+    "timeFormat": "Formato de hora",
+    "timeFormats": {
+      "12h": "12 horas (AM/PM)",
+      "24h": "24 horas"
+    }
+  },
+  "advanced": {
+    "title": "Configuración avanzada",
+    "apiAccess": "Acceso a API",
+    "developerMode": "Modo desarrollador",
+    "exportData": "Exportar datos",
+    "importData": "Importar datos",
+    "clearCache": "Limpiar caché de la aplicación",
+    "cacheCleared": "Caché de la aplicación limpiada correctamente",
+    "debugMode": "Modo de depuración",
+    "warning": "Advertencia: Esta configuración está destinada únicamente a usuarios avanzados."
+  }
+} 

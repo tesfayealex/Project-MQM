@@ -1,0 +1,23 @@
+{
+  "welcome": "Bienvenido a tu Panel de Control",
+  "overview": "Resumen",
+  "recent": "Actividad Reciente",
+  "stats": "Estadísticas",
+  "surveys": {
+    "title": "Encuestas",
+    "active": "Encuestas Activas",
+    "completed": "Encuestas Completadas",
+    "create": "Crear Encuesta"
+  },
+  "analytics": {
+    "title": "Análisis",
+    "responses": "Respuestas Totales",
+    "completion": "Tasa de Finalización",
+    "engagementScore": "Puntuación de Participación"
+  },
+  "profile": {
+    "title": "Perfil",
+    "edit": "Editar Perfil",
+    "settings": "Configuración"
+  }
+}

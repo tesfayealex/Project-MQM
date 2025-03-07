@@ -52,7 +52,7 @@ export function ClusterList({
                     <div className="grid grid-cols-12 text-xs text-gray-500 font-medium px-3 py-1 bg-gray-50 rounded-t-md">
                         <div className="col-span-5">Cluster Name</div>
                         <div className="col-span-2 text-center">Frequency</div>
-                        <div className="col-span-3 text-center">Sentiment</div>
+                        {/* <div className="col-span-3 text-center">Sentiment</div> */}
                         <div className="col-span-2 text-center">Category</div>
                     </div>
                     {clusters.map((cluster, index) => (
@@ -78,7 +78,7 @@ export function ClusterList({
                                     </div>
                                 )}
                             </div>
-                            <div className="col-span-3 text-center">
+                            {/* <div className="col-span-3 text-center">
                                 <span className={
                                     cluster.sentiment_score > 0 ? "text-green-600" :
                                     cluster.sentiment_score < 0 ? "text-red-600" :
@@ -86,7 +86,7 @@ export function ClusterList({
                                 }>
                                     {cluster.sentiment_score.toFixed(2)}
                                 </span>
-                            </div>
+                            </div> */}
                             <div className="col-span-2 text-center">
                                 <span className={`px-2 py-0.5 text-xs rounded-full ${
                                     cluster.is_positive ? "bg-green-100 text-green-800" : 

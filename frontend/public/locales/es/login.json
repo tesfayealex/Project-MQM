@@ -1,0 +1,13 @@
+{
+  "title": "Bienvenido de nuevo",
+  "subtitle": "Inicia sesión en tu cuenta",
+  "email": "Correo electrónico",
+  "password": "Contraseña",
+  "signin": "Iniciar sesión",
+  "signingIn": "Iniciando sesión...",
+  "errors": {
+    "invalidCredentials": "Correo electrónico o contraseña inválidos",
+    "sessionExpired": "Tu sesión ha expirado. Por favor, inicia sesión de nuevo.",
+    "unknown": "Ocurrió un error durante el inicio de sesión"
+  }
+} 

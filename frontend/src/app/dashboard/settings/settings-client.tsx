@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ async function processText(text: string, language: string): Promise<ProcessTextR
 }
 
 export default function SettingsClient() {
+  const { t } = useTranslation('settings');
   const [clusters, setClusters] = useState<CustomWordCluster[]>([]);
   const [newClusterName, setNewClusterName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -66,7 +68,7 @@ export default function SettingsClient() {
       console.error('Error loading clusters:', error);
       await handleAuthError(error);
       toast({
-        title: 'Error',
+        title: t('general.error'),
         description: 'Failed to load word clusters. Please try again.',
         variant: 'destructive',
       });
@@ -100,7 +102,7 @@ export default function SettingsClient() {
       console.error('Error adding cluster:', error);
       await handleAuthError(error);
       toast({
-        title: 'Error',
+        title: t('general.error'),
         description: 'Failed to add cluster. Please try again.',
         variant: 'destructive',
       });
@@ -126,7 +128,7 @@ export default function SettingsClient() {
       console.error('Error deleting cluster:', error);
       await handleAuthError(error);
       toast({
-        title: 'Error',
+        title: t('general.error'),
         description: 'Failed to delete cluster. Please try again.',
         variant: 'destructive',
       });
@@ -161,7 +163,7 @@ export default function SettingsClient() {
       console.error('Error processing text:', error);
       await handleAuthError(error);
       toast({
-        title: 'Error',
+        title: t('general.error'),
         description: error.message || 'Failed to process text. Please try again.',
         variant: 'destructive',
       });
@@ -172,14 +174,14 @@ export default function SettingsClient() {
 
   return (
     <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-8">Settings</h1>
+      <h1 className="text-3xl font-bold mb-8">{t('general.title')}</h1>
       
       <Tabs defaultValue="clusters">
         <TabsList className="mb-6">
           <TabsTrigger value="clusters">Word Clusters</TabsTrigger>
           <TabsTrigger value="text-processing">Text Processing</TabsTrigger>
-          <TabsTrigger value="account">Account</TabsTrigger>
-          <TabsTrigger value="preferences">Preferences</TabsTrigger>
+          <TabsTrigger value="account">{t('navigation.account')}</TabsTrigger>
+          <TabsTrigger value="preferences">{t('navigation.appearance')}</TabsTrigger>
         </TabsList>
         
         <TabsContent value="clusters">
@@ -257,96 +259,21 @@ export default function SettingsClient() {
           </Card>
         </TabsContent>
         
-        <TabsContent value="text-processing">
-          <Card>
-            <CardHeader>
-              <CardTitle>Text Processing</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleProcessText} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="language">Select Language</Label>
-                  <Select
-                    value={selectedLanguage}
-                    onValueChange={setSelectedLanguage}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select Language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">English</SelectItem>
-                      <SelectItem value="de">German</SelectItem>
-                      <SelectItem value="es">Spanish</SelectItem>
-                      <SelectItem value="fr">French</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="textToProcess">Enter Text to Process</Label>
-                  <Textarea
-                    id="textToProcess"
-                    value={textToProcess}
-                    onChange={(e) => setTextToProcess(e.target.value)}
-                    placeholder="Enter text here..."
-                    rows={5}
-                    className="w-full"
-                  />
-                </div>
-                
-                <Button type="submit" disabled={isProcessing || !textToProcess.trim()}>
-                  {isProcessing ? (
-                    <>Processing...</>
-                  ) : (
-                    <>Process Text</>
-                  )}
-                </Button>
-              </form>
-              
-              {processedWords.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="text-lg font-semibold mb-2">Processed Words:</h3>
-                  <div className="border rounded-md p-4 max-h-60 overflow-y-auto">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <h4 className="font-medium mb-2">Words</h4>
-                        <div className="space-y-1">
-                          {processedWords.map((word, index) => (
-                            <Badge key={index} variant="outline" className="mr-2 mb-2">
-                              {word}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <h4 className="font-medium mb-2">Cluster Assignments</h4>
-                        <div className="space-y-1">
-                          {structuredWords.map((item, index) => (
-                            <div key={index} className="flex items-center space-x-2 mb-2">
-                              <Badge variant="outline">{item.word}</Badge>
-                              <span>→</span>
-                              <Badge variant="secondary">{item.assigned_cluster}</Badge>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
         <TabsContent value="account">
           <Card>
             <CardHeader>
-              <CardTitle>Account Settings</CardTitle>
+              <CardTitle>{t('account.title')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="py-4 text-center text-muted-foreground">
-                Account settings feature coming soon.
+              <p className="text-muted-foreground mb-6">
+                {t('account.profileInfo')}
+              </p>
+              
+              {/* Account settings will go here */}
+              <div className="space-y-4">
+                <Button disabled>{t('account.changePassword')}</Button>
+                <br />
+                <Button variant="destructive" disabled>{t('account.deleteAccount')}</Button>
               </div>
             </CardContent>
           </Card>
@@ -355,12 +282,121 @@ export default function SettingsClient() {
         <TabsContent value="preferences">
           <Card>
             <CardHeader>
-              <CardTitle>Preferences</CardTitle>
+              <CardTitle>{t('appearance.title')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="py-4 text-center text-muted-foreground">
-                Preferences feature coming soon.
+              <div className="space-y-4">
+                <div>
+                  <Label>{t('appearance.theme')}</Label>
+                  <Select defaultValue="system">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="light">{t('appearance.themes.light')}</SelectItem>
+                      <SelectItem value="dark">{t('appearance.themes.dark')}</SelectItem>
+                      <SelectItem value="system">{t('appearance.themes.system')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label>{t('language.title')}</Label>
+                  <Select defaultValue="en">
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="en">{t('language.languages.en')}</SelectItem>
+                      <SelectItem value="fr">{t('language.languages.fr')}</SelectItem>
+                      <SelectItem value="es">{t('language.languages.es')}</SelectItem>
+                      <SelectItem value="de">{t('language.languages.de')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <Button disabled>{t('general.save')}</Button>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="text-processing">
+          <Card>
+            <CardHeader>
+              <CardTitle>Text Processing Test Tool</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-6">
+                <form onSubmit={handleProcessText} className="space-y-4">
+                  <div>
+                    <Label htmlFor="language-select">Language</Label>
+                    <Select value={selectedLanguage} onValueChange={setSelectedLanguage}>
+                      <SelectTrigger id="language-select">
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="en">English</SelectItem>
+                        <SelectItem value="fr">French</SelectItem>
+                        <SelectItem value="es">Spanish</SelectItem>
+                        <SelectItem value="de">German</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="text-to-process">Text to Process</Label>
+                    <Textarea 
+                      id="text-to-process"
+                      placeholder="Enter text to extract and cluster words"
+                      value={textToProcess}
+                      onChange={(e) => setTextToProcess(e.target.value)}
+                      rows={5}
+                    />
+                  </div>
+                  
+                  <Button type="submit" disabled={isProcessing || !textToProcess.trim()}>
+                    {isProcessing ? 'Processing...' : 'Process Text'}
+                  </Button>
+                </form>
+              </div>
+              
+              {processedWords.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">Processed Words</h3>
+                  <div className="flex flex-wrap gap-2 p-3 border rounded-md max-h-60 overflow-y-auto">
+                    {processedWords.map((word, index) => (
+                      <Badge key={index} variant="outline">{word}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {structuredWords.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">Word Clusters</h3>
+                  <div className="border rounded-md max-h-80 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Word</TableHead>
+                          <TableHead>Assigned Cluster</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {structuredWords.map((item, index) => (
+                          <TableRow key={index}>
+                            <TableCell>{item.word}</TableCell>
+                            <TableCell>
+                              <Badge>{item.assigned_cluster}</Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Remove the i18n config from here - we'll use middleware instead
 };
 
 export default nextConfig;

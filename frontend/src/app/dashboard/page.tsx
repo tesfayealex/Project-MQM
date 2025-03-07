@@ -6,6 +6,7 @@ import { getDashboardStats, DashboardStats } from "@/lib/services/dashboard-serv
 import { useToast } from "@/components/ui/use-toast"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
+import { useTranslation } from "react-i18next"
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -14,6 +15,7 @@ export default function DashboardPage() {
   const { toast } = useToast()
   const router = useRouter()
   const { status, data: session } = useSession()
+  const { t } = useTranslation('dashboard')
   // Track attempts to prevent loops
   const fetchAttempts = useRef(0)
   const hasShownError = useRef(false)
@@ -70,14 +72,14 @@ export default function DashboardPage() {
           
           if (fetchAttempts.current >= 2) {
             // If we've already retried, show an error to the user
-            setError("Unable to load dashboard data. Please try logging out and back in.");
+            setError(t("Unable to load dashboard data. Please try logging out and back in."));
           }
         } else {
-          setError(err.message || 'Failed to fetch dashboard stats');
+          setError(err.message || t('Failed to fetch dashboard stats'));
           toast({
             variant: "destructive",
-            title: "Error loading dashboard",
-            description: err.message || 'Failed to fetch dashboard stats',
+            title: t("Error loading dashboard"),
+            description: err.message || t('Failed to fetch dashboard stats'),
           });
         }
         // Mark that we've shown an error to the user
@@ -101,8 +103,8 @@ export default function DashboardPage() {
     return (
       <div className="space-y-6 w-full">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Loading session...</p>
+          <h1 className="text-3xl font-bold tracking-tight">{t('dashboard.title', 'Dashboard')}</h1>
+          <p className="text-muted-foreground">{t('loading_session', 'Loading session...')}</p>
         </div>
       </div>
     );
@@ -112,9 +114,9 @@ export default function DashboardPage() {
     <div className="space-y-6 w-full">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t('dashboard.title', 'Dashboard')}</h1>
           <p className="text-muted-foreground">
-            Welcome back!
+            {t('welcome')}
           </p>
         </div>
         
@@ -123,7 +125,7 @@ export default function DashboardPage() {
             onClick={handleManualRefresh}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm"
           >
-            Retry Loading
+            {t('retry_loading', 'Retry Loading')}
           </button>
         )}
       </div>
@@ -132,7 +134,7 @@ export default function DashboardPage() {
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Total Surveys</div>
+              <div className="text-sm font-medium text-muted-foreground">{t('surveys.title')}</div>
               <div className="mt-2 text-2xl font-bold">{loading ? "-" : stats?.total_surveys || 0}</div>
             </div>
             <ClipboardList className="h-4 w-4 text-muted-foreground" />
@@ -140,7 +142,7 @@ export default function DashboardPage() {
           {!loading && stats?.user_growth_rate && (
             <div className="mt-4 flex items-center text-sm text-green-500">
               <TrendingUp className="mr-1 h-4 w-4" />
-              <span>+{stats.user_growth_rate}% from last month</span>
+              <span>+{stats.user_growth_rate}% {t('from_last_month', 'from last month')}</span>
             </div>
           )}
         </div>
@@ -148,7 +150,7 @@ export default function DashboardPage() {
           <div className="rounded-lg border bg-card p-6">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-muted-foreground">Total Users</div>
+                <div className="text-sm font-medium text-muted-foreground">{t('total_users', 'Total Users')}</div>
                 <div className="mt-2 text-2xl font-bold">{loading ? "-" : stats?.total_users || 0}</div>
               </div>
               <Users className="h-4 w-4 text-muted-foreground" />
@@ -156,7 +158,7 @@ export default function DashboardPage() {
             {!loading && stats?.user_growth_rate && (
               <div className="mt-4 flex items-center text-sm text-green-500">
                 <TrendingUp className="mr-1 h-4 w-4" />
-                <span>+{stats.user_growth_rate}% from last month</span>
+                <span>+{stats.user_growth_rate}% {t('from_last_month', 'from last month')}</span>
               </div>
             )}
           </div>
@@ -164,7 +166,7 @@ export default function DashboardPage() {
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Total Responses</div>
+              <div className="text-sm font-medium text-muted-foreground">{t('analytics.responses', 'Total Responses')}</div>
               <div className="mt-2 text-2xl font-bold">{loading ? "-" : stats?.total_responses || 0}</div>
             </div>
             <BarChart className="h-4 w-4 text-muted-foreground" />
@@ -172,14 +174,14 @@ export default function DashboardPage() {
           {!loading && stats?.user_growth_rate && (
             <div className="mt-4 flex items-center text-sm text-green-500">
               <TrendingUp className="mr-1 h-4 w-4" />
-              <span>+{stats.user_growth_rate}% from last month</span>
+              <span>+{stats.user_growth_rate}% {t('from_last_month', 'from last month')}</span>
             </div>
           )}
         </div>
         <div className="rounded-lg border bg-card p-6">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-muted-foreground">Completion Rate</div>
+              <div className="text-sm font-medium text-muted-foreground">{t('analytics.completion', 'Completion Rate')}</div>
               <div className="mt-2 text-2xl font-bold">
                 {loading ? "-" : `${stats?.survey_completion_rate || 0}%`}
               </div>
@@ -189,7 +191,7 @@ export default function DashboardPage() {
           {!loading && stats?.user_growth_rate && (
             <div className="mt-4 flex items-center text-sm text-green-500">
               <TrendingUp className="mr-1 h-4 w-4" />
-              <span>+{stats.user_growth_rate}% from last month</span>
+              <span>+{stats.user_growth_rate}% {t('from_last_month', 'from last month')}</span>
             </div>
           )}
         </div>
@@ -203,14 +205,14 @@ export default function DashboardPage() {
       
       {loading && status === "authenticated" && (
         <div className="rounded-lg border p-4 text-sm">
-          Loading dashboard data...
+          {t('loading_data', 'Loading dashboard data...')}
         </div>
       )}
       
       {!loading && stats?.recent_activity && stats.recent_activity.length > 0 && (
         <div className="rounded-lg border w-full">
           <div className="p-6">
-            <h2 className="text-lg font-semibold">Recent Activity</h2>
+            <h2 className="text-lg font-semibold">{t('recent', 'Recent Activity')}</h2>
             <div className="mt-4 space-y-4">
               {stats.recent_activity.map((activity, index) => (
                 <div key={index} className="flex items-center gap-4">

@@ -1,0 +1,83 @@
+{
+  "list": {
+    "title": "Usuarios",
+    "description": "Gestionar usuarios del sistema y permisos",
+    "create": "Crear Usuario",
+    "columns": {
+      "name": "Nombre",
+      "email": "Correo electrónico",
+      "role": "Rol",
+      "status": "Estado",
+      "lastLogin": "Último Acceso",
+      "actions": "Acciones"
+    },
+    "status": {
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "suspended": "Suspendido"
+    },
+    "empty": "No se encontraron usuarios",
+    "loading": "Cargando usuarios..."
+  },
+  "detail": {
+    "title": "Detalles de Usuario",
+    "edit": "Editar Usuario",
+    "delete": "Eliminar Usuario",
+    "back": "Volver a Usuarios",
+    "profile": "Perfil",
+    "personal": "Información Personal",
+    "permissions": "Permisos",
+    "activity": "Registro de Actividad"
+  },
+  "create": {
+    "title": "Crear Usuario",
+    "description": "Añadir un nuevo usuario al sistema",
+    "success": "Usuario creado con éxito"
+  },
+  "edit": {
+    "title": "Editar Usuario",
+    "description": "Modificar información y permisos del usuario",
+    "success": "Usuario actualizado con éxito"
+  },
+  "fields": {
+    "firstName": "Nombre",
+    "lastName": "Apellido",
+    "email": "Correo Electrónico",
+    "password": "Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "role": "Rol",
+    "department": "Departamento",
+    "phone": "Número de Teléfono",
+    "status": "Estado",
+    "permissions": "Permisos"
+  },
+  "roles": {
+    "admin": "Administrador",
+    "moderator": "Moderador",
+    "organizer": "Organizador",
+    "user": "Usuario Regular"
+  },
+  "buttons": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "resetPassword": "Restablecer Contraseña",
+    "suspend": "Suspender Cuenta",
+    "activate": "Activar Cuenta"
+  },
+  "messages": {
+    "confirmDelete": "¿Estás seguro de que quieres eliminar este usuario?",
+    "confirmSuspend": "¿Estás seguro de que quieres suspender este usuario?",
+    "deleted": "Usuario eliminado con éxito",
+    "error": "Ha ocurrido un error",
+    "permissionsUpdated": "Permisos actualizados con éxito"
+  },
+  "activity": {
+    "loginTime": "Hora de Ingreso",
+    "logoutTime": "Hora de Salida",
+    "ipAddress": "Dirección IP",
+    "device": "Dispositivo",
+    "action": "Acción",
+    "empty": "No hay actividad registrada"
+  }
+} 

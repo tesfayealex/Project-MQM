@@ -1,0 +1,13 @@
+{
+  "title": "Welcome back",
+  "subtitle": "Sign in to your account",
+  "email": "Email",
+  "password": "Password",
+  "signin": "Sign in",
+  "signingIn": "Signing in...",
+  "errors": {
+    "invalidCredentials": "Invalid email or password",
+    "sessionExpired": "Your session has expired. Please log in again.",
+    "unknown": "An error occurred during sign in"
+  }
+} 

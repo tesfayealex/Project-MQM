@@ -1,0 +1,105 @@
+{
+  "general": {
+    "title": "Einstellungen",
+    "description": "Anwendungseinstellungen und Präferenzen konfigurieren",
+    "save": "Änderungen speichern",
+    "reset": "Auf Standardwerte zurücksetzen",
+    "saved": "Einstellungen erfolgreich gespeichert",
+    "error": "Fehler beim Speichern der Einstellungen"
+  },
+  "navigation": {
+    "general": "Allgemein",
+    "account": "Konto",
+    "appearance": "Erscheinungsbild",
+    "notifications": "Benachrichtigungen",
+    "privacy": "Datenschutz & Sicherheit",
+    "language": "Sprache",
+    "advanced": "Erweitert"
+  },
+  "account": {
+    "title": "Kontoeinstellungen",
+    "profileInfo": "Profilinformationen",
+    "changePassword": "Passwort ändern",
+    "twoFactor": "Zwei-Faktor-Authentifizierung",
+    "connectedAccounts": "Verbundene Konten",
+    "deleteAccount": "Konto löschen",
+    "currentPassword": "Aktuelles Passwort",
+    "newPassword": "Neues Passwort",
+    "confirmPassword": "Neues Passwort bestätigen",
+    "passwordChanged": "Passwort erfolgreich geändert",
+    "confirmDelete": "Sind Sie sicher, dass Sie Ihr Konto löschen möchten? Diese Aktion kann nicht rückgängig gemacht werden."
+  },
+  "appearance": {
+    "title": "Erscheinungsbild-Einstellungen",
+    "theme": "Design",
+    "themes": {
+      "light": "Hell",
+      "dark": "Dunkel",
+      "system": "Systemstandard"
+    },
+    "fontSize": "Schriftgröße",
+    "fontSizes": {
+      "small": "Klein",
+      "medium": "Mittel",
+      "large": "Groß"
+    },
+    "compactMode": "Kompakter Modus",
+    "enableAnimations": "Animationen aktivieren"
+  },
+  "notifications": {
+    "title": "Benachrichtigungseinstellungen",
+    "email": "E-Mail-Benachrichtigungen",
+    "push": "Push-Benachrichtigungen",
+    "inApp": "In-App-Benachrichtigungen",
+    "types": {
+      "surveys": "Umfragen und Antworten",
+      "messages": "Nachrichten",
+      "updates": "Systemupdates",
+      "reminders": "Erinnerungen"
+    },
+    "frequency": "Benachrichtigungshäufigkeit",
+    "frequencies": {
+      "immediately": "Sofort",
+      "daily": "Tägliche Zusammenfassung",
+      "weekly": "Wöchentliche Zusammenfassung"
+    }
+  },
+  "privacy": {
+    "title": "Datenschutz & Sicherheit",
+    "dataSharing": "Datenaustausch",
+    "cookieSettings": "Cookie-Einstellungen",
+    "thirdPartyAccess": "Zugriff durch Drittanbieter",
+    "sessionManagement": "Sitzungsverwaltung",
+    "activeSessions": "Aktive Sitzungen",
+    "endAllSessions": "Alle anderen Sitzungen beenden",
+    "sessionEnded": "Alle anderen Sitzungen wurden beendet"
+  },
+  "language": {
+    "title": "Spracheinstellungen",
+    "appLanguage": "Anwendungssprache",
+    "contentLanguage": "Inhaltssprache",
+    "languages": {
+      "en": "Englisch",
+      "fr": "Französisch",
+      "es": "Spanisch",
+      "de": "Deutsch"
+    },
+    "dateFormat": "Datumsformat",
+    "timeFormat": "Zeitformat",
+    "timeFormats": {
+      "12h": "12-Stunden-Format (AM/PM)",
+      "24h": "24-Stunden-Format"
+    }
+  },
+  "advanced": {
+    "title": "Erweiterte Einstellungen",
+    "apiAccess": "API-Zugriff",
+    "developerMode": "Entwicklermodus",
+    "exportData": "Daten exportieren",
+    "importData": "Daten importieren",
+    "clearCache": "Anwendungs-Cache leeren",
+    "cacheCleared": "Anwendungs-Cache erfolgreich geleert",
+    "debugMode": "Debug-Modus",
+    "warning": "Warnung: Diese Einstellungen sind nur für fortgeschrittene Benutzer gedacht."
+  }
+} 

@@ -1,0 +1,23 @@
+{
+  "welcome": "Willkommen zu Ihrem Dashboard",
+  "overview": "Übersicht",
+  "recent": "Letzte Aktivitäten",
+  "stats": "Statistiken",
+  "surveys": {
+    "title": "Umfragen",
+    "active": "Aktive Umfragen",
+    "completed": "Abgeschlossene Umfragen",
+    "create": "Umfrage erstellen"
+  },
+  "analytics": {
+    "title": "Analysen",
+    "responses": "Gesamtantworten",
+    "completion": "Abschlussrate",
+    "engagementScore": "Engagement-Bewertung"
+  },
+  "profile": {
+    "title": "Profil",
+    "edit": "Profil bearbeiten",
+    "settings": "Einstellungen"
+  }
+} 

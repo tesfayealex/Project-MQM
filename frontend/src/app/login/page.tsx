@@ -4,23 +4,25 @@ import { useState, useEffect } from "react"
 import { signIn, signOut } from "next-auth/react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useToast } from "@/components/ui/use-toast"
+import { useTranslation } from "react-i18next"
 
 export default function LoginPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const { t } = useTranslation('login')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   // Handle URL error params
   useEffect(() => {
     if (searchParams?.get("error") === "CredentialsSignin") {
-      setError("Invalid email or password")
+      setError(t('errors.invalidCredentials'))
     }
     if (searchParams?.get("error") === "session_expired") {
-      setError("Your session has expired. Please log in again.")
+      setError(t('errors.sessionExpired'))
     }
-  }, [searchParams])
+  }, [searchParams, t])
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -80,10 +82,10 @@ export default function LoginPage() {
             
             if (!retryResponse.ok) {
               const retryErrorData = await retryResponse.json().catch(() => ({ detail: "Unknown error" }))
-              throw new Error(retryErrorData.detail || "Invalid credentials")
+              throw new Error(retryErrorData.detail || t('errors.invalidCredentials'))
             }
           } else {
-            throw new Error(errorData.detail || "Invalid credentials")
+            throw new Error(errorData.detail || t('errors.invalidCredentials'))
           }
         }
       } catch (err) {
@@ -102,7 +104,7 @@ export default function LoginPage() {
 
       if (response?.error) {
         console.error("Login error:", response.error)
-        setError("Invalid email or password")
+        setError(t('errors.invalidCredentials'))
       } else if (response?.ok) {
         console.log("Login successful, redirecting to dashboard")
         
@@ -117,7 +119,7 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error("Login error:", err)
-      setError(err.message || "An error occurred during sign in")
+      setError(err.message || t('errors.unknown'))
     } finally {
       setIsLoading(false)
     }
@@ -127,9 +129,9 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm space-y-8 rounded-lg border bg-card p-6 shadow-sm">
         <div className="space-y-2 text-center">
-          <h1 className="text-2xl font-bold">Welcome back</h1>
+          <h1 className="text-2xl font-bold">{t('title')}</h1>
           <p className="text-sm text-muted-foreground">
-            Sign in to your account
+            {t('subtitle')}
           </p>
         </div>
         <form onSubmit={onSubmit} className="space-y-4">
@@ -138,7 +140,7 @@ export default function LoginPage() {
               className="text-sm font-medium leading-none"
               htmlFor="email"
             >
-              Email
+              {t('email')}
             </label>
             <input
               id="email"
@@ -154,7 +156,7 @@ export default function LoginPage() {
               className="text-sm font-medium leading-none"
               htmlFor="password"
             >
-              Password
+              {t('password')}
             </label>
             <input
               id="password"
@@ -175,7 +177,7 @@ export default function LoginPage() {
             disabled={isLoading}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {isLoading ? "Signing in..." : "Sign in"}
+            {isLoading ? t('signingIn') : t('signin')}
           </button>
         </form>
       </div>

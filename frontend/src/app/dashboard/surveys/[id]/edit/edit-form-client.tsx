@@ -7,6 +7,7 @@ import SurveyForm from '@/components/surveys/SurveyForm';
 import { getSurvey, updateSurvey } from '@/lib/services/survey-service';
 import { handleAuthError } from '@/lib/auth-utils';
 import { Survey } from '@/types/survey';
+import { useTranslation } from 'react-i18next';
 
 interface EditSurveyFormClientProps {
   params: { id: string } | { value: string } | string;
@@ -14,9 +15,16 @@ interface EditSurveyFormClientProps {
 
 export default function EditSurveyFormClient({ params }: EditSurveyFormClientProps) {
   const router = useRouter();
+  const { t, i18n } = useTranslation('surveys', { useSuspense: false });
   const [isLoading, setIsLoading] = useState(true);
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [surveyId, setSurveyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    i18n.loadNamespaces('surveys').catch(err => 
+      console.error('Failed to load surveys namespace:', err)
+    );
+  }, [i18n]);
 
   useEffect(() => {
     async function fetchSurvey() {
@@ -33,7 +41,7 @@ export default function EditSurveyFormClient({ params }: EditSurveyFormClientPro
         }
 
         if (!parsedId || parsedId === 'undefined') {
-          throw new Error('Invalid survey ID');
+          throw new Error(t('errors.invalidSurveyId'));
         }
 
         setSurveyId(parsedId);
@@ -72,62 +80,34 @@ export default function EditSurveyFormClient({ params }: EditSurveyFormClientPro
     }
 
     fetchSurvey();
-  }, [params, router, toast]);
+  }, [params, router, t]);
 
   const handleSubmit = async (data: any) => {
-    if (!surveyId) return;
-    
-    setIsLoading(true);
-    try {
-      console.log('Submitting survey data:', data);
-      
-      // Format data for the backend
-      const surveyData = {
-        ...data,
-        // Ensure required fields are set
-        title: data.title || 'Untitled Survey',
-        languages: data.languages && data.languages.length ? data.languages : ['en'],
-        is_active: data.is_active !== undefined ? data.is_active : true,
-        
-        // If questions are provided, ensure they have required fields
-        questions: data.questions?.map((q: any, index: number) => ({
-          ...q,
-          order: index + 1,
-          type: q.type || 'free_text',
-          is_required: q.is_required !== undefined ? q.is_required : true,
-          language: q.language || 'en'
-        })) || []
-      };
-      
-      console.log('Formatted survey data:', surveyData);
-      const response = await updateSurvey(surveyId, surveyData);
-      console.log('Survey updated successfully:', response);
-      
+    if (!surveyId) {
       toast({
-        title: 'Survey Updated',
-        description: 'Your survey has been updated successfully.',
+        title: t('errors.error'),
+        description: t('errors.missingSurveyId'),
+        variant: 'destructive',
       });
-      
-      router.push(`/dashboard/surveys/${surveyId}`);
-    } catch (error: any) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await updateSurvey(surveyId, data);
+      toast({
+        title: t('success.updated'),
+        description: t('success.surveyUpdated'),
+      });
+      router.push('/dashboard/surveys');
+    } catch (error) {
       console.error('Error updating survey:', error);
-      
-      // Handle authentication errors
-      const isAuthError = await handleAuthError(error);
-      if (!isAuthError) {
-        // Get a more detailed error message
-        let errorMessage = 'Failed to update survey. Please try again.';
-        if (error instanceof Error) {
-          errorMessage = error.message;
-        }
-        
-        // Show error toast
-        toast({
-          variant: 'destructive',
-          title: 'Error Updating Survey',
-          description: errorMessage,
-        });
-      }
+      handleAuthError(error);
+      toast({
+        title: t('errors.error'),
+        description: t('errors.updateFailed'),
+        variant: 'destructive',
+      });
     } finally {
       setIsLoading(false);
     }

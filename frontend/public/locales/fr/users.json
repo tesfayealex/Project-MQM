@@ -1,0 +1,83 @@
+{
+  "list": {
+    "title": "Utilisateurs",
+    "description": "Gérer les utilisateurs du système et les permissions",
+    "create": "Créer un Utilisateur",
+    "columns": {
+      "name": "Nom",
+      "email": "Email",
+      "role": "Rôle",
+      "status": "Statut",
+      "lastLogin": "Dernière Connexion",
+      "actions": "Actions"
+    },
+    "status": {
+      "active": "Actif",
+      "inactive": "Inactif",
+      "suspended": "Suspendu"
+    },
+    "empty": "Aucun utilisateur trouvé",
+    "loading": "Chargement des utilisateurs..."
+  },
+  "detail": {
+    "title": "Détails de l'Utilisateur",
+    "edit": "Modifier l'Utilisateur",
+    "delete": "Supprimer l'Utilisateur",
+    "back": "Retour aux Utilisateurs",
+    "profile": "Profil",
+    "personal": "Informations Personnelles",
+    "permissions": "Permissions",
+    "activity": "Journal d'Activité"
+  },
+  "create": {
+    "title": "Créer un Utilisateur",
+    "description": "Ajouter un nouvel utilisateur au système",
+    "success": "Utilisateur créé avec succès"
+  },
+  "edit": {
+    "title": "Modifier l'Utilisateur",
+    "description": "Modifier les informations et les permissions de l'utilisateur",
+    "success": "Utilisateur mis à jour avec succès"
+  },
+  "fields": {
+    "firstName": "Prénom",
+    "lastName": "Nom",
+    "email": "Adresse Email",
+    "password": "Mot de Passe",
+    "confirmPassword": "Confirmer le Mot de Passe",
+    "role": "Rôle",
+    "department": "Département",
+    "phone": "Numéro de Téléphone",
+    "status": "Statut",
+    "permissions": "Permissions"
+  },
+  "roles": {
+    "admin": "Administrateur",
+    "moderator": "Modérateur",
+    "organizer": "Organisateur",
+    "user": "Utilisateur Régulier"
+  },
+  "buttons": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "resetPassword": "Réinitialiser le Mot de Passe",
+    "suspend": "Suspendre le Compte",
+    "activate": "Activer le Compte"
+  },
+  "messages": {
+    "confirmDelete": "Êtes-vous sûr de vouloir supprimer cet utilisateur?",
+    "confirmSuspend": "Êtes-vous sûr de vouloir suspendre cet utilisateur?",
+    "deleted": "Utilisateur supprimé avec succès",
+    "error": "Une erreur s'est produite",
+    "permissionsUpdated": "Permissions mises à jour avec succès"
+  },
+  "activity": {
+    "loginTime": "Heure de Connexion",
+    "logoutTime": "Heure de Déconnexion",
+    "ipAddress": "Adresse IP",
+    "device": "Appareil",
+    "action": "Action",
+    "empty": "Aucune activité enregistrée"
+  }
+} 

@@ -1,0 +1,20 @@
+{
+  "app": {
+    "name": "myQuickMessage",
+    "switchLanguage": "Language"
+  },
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "surveys": "Surveys",
+    "analytics": "Analytics",
+    "users": "Users",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+  "languages": {
+    "en": "English",
+    "fr": "French",
+    "es": "Spanish",
+    "de": "German"
+  }
+} 

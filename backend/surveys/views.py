@@ -111,8 +111,7 @@ class SurveyViewSet(viewsets.ModelViewSet):
         if search:
             queryset = queryset.filter(
                 Q(title__icontains=search) | 
-                Q(description__icontains=search) |
-                Q(short_id__icontains=search)
+                Q(description__icontains=search)
             )
             
         return queryset.order_by('-created_at')
@@ -197,15 +196,6 @@ class SurveyViewSet(viewsets.ModelViewSet):
                     'detail': 'This survey has expired',
                     'survey': survey_data,
                     'status': 'expired'
-                }, status=status.HTTP_400_BAD_REQUEST)
-                
-            # Check if survey has reached max participants
-            current_responses = Response.objects.filter(survey=survey).count()
-            if survey.max_participants and current_responses >= survey.max_participants:
-                return DRFResponse({
-                    'detail': 'This survey has reached its maximum number of participants',
-                    'survey': survey_data,
-                    'status': 'full'
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             return DRFResponse(survey_data)

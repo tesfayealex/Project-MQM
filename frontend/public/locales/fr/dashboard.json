@@ -1,0 +1,23 @@
+{
+  "welcome": "Bienvenue sur votre Tableau de Bord",
+  "overview": "Aperçu",
+  "recent": "Activité Récente",
+  "stats": "Statistiques",
+  "surveys": {
+    "title": "Sondages",
+    "active": "Sondages Actifs",
+    "completed": "Sondages Terminés",
+    "create": "Créer un Sondage"
+  },
+  "analytics": {
+    "title": "Analyses",
+    "responses": "Réponses Totales",
+    "completion": "Taux de Complétion",
+    "engagementScore": "Score d'Engagement"
+  },
+  "profile": {
+    "title": "Profil",
+    "edit": "Modifier le Profil",
+    "settings": "Paramètres"
+  }
+} 

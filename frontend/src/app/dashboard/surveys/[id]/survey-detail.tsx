@@ -4,23 +4,27 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeftIcon, PencilIcon, QrCodeIcon } from '@heroicons/react/24/outline';
-import { getSurvey, getSurveyQRCodeData } from '@/lib/services/survey-service';
+import { ArrowLeftIcon, PencilIcon, QrCodeIcon, ClipboardIcon, CheckIcon } from '@heroicons/react/24/outline';
+import { getSurvey, getSurveyQRCodeData, getPublicSurvey } from '@/lib/services/survey-service';
 import { Survey } from '@/types/survey';
 import { handleAuthError } from '@/lib/auth-utils';
 import { useToast } from '@/components/ui/use-toast';
 import { format } from 'date-fns';
 import Image from 'next/image';
+import { useTranslation } from 'react-i18next';
+import { getCookie } from 'cookies-next';
 
 export default function SurveyDetail({ params }: { params: { id: string } | { value: string } | string }) {
   const router = useRouter();
   const { toast } = useToast();
+  const { t, i18n } = useTranslation('surveys', { useSuspense: false });
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [surveyId, setSurveyId] = useState<string | null>(null);
+  const [currentLanguage, setCurrentLanguage] = useState<string>('en');
   const [qrCodeData, setQrCodeData] = useState<{
     tokens: Array<{
       id: number|null,
@@ -31,6 +35,33 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
     }>,
     primary_token: string
   } | null>(null);
+  const [publicLink, setPublicLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    // Load translations and set initial language
+    i18n.loadNamespaces(['surveys', 'common']).then(() => {
+      const savedLocale = getCookie('NEXT_LOCALE') as string;
+      if (savedLocale && ['en', 'fr', 'es', 'de'].includes(savedLocale)) {
+        setCurrentLanguage(savedLocale);
+        i18n.changeLanguage(savedLocale);
+      }
+    }).catch(err => console.error('Failed to load namespaces:', err));
+  }, [i18n]);
+
+  useEffect(() => {
+    // Update language when cookie changes
+    const checkLanguage = () => {
+      const newLocale = getCookie('NEXT_LOCALE') as string;
+      if (newLocale && newLocale !== currentLanguage) {
+        setCurrentLanguage(newLocale);
+        i18n.changeLanguage(newLocale);
+      }
+    };
+
+    const interval = setInterval(checkLanguage, 1000);
+    return () => clearInterval(interval);
+  }, [currentLanguage, i18n]);
 
   useEffect(() => {
     async function fetchSurvey() {
@@ -61,7 +92,7 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
         setSurvey(data);
         
         // Fetch QR code data if survey has token
-        if (data.token) {
+        if (data.tokens && data.tokens.length > 0) {
           try {
             const qrData = await getSurveyQRCodeData(parsedId);
             setQrCodeData(qrData);
@@ -69,6 +100,16 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
             console.error('Error fetching QR code data:', qrError);
             // Don't set error state, just log it - not critical
           }
+        }
+        
+        // Get the public link if available
+        try {
+          const publicSurvey = await getPublicSurvey(parsedId);
+          if (publicSurvey && 'url' in publicSurvey && typeof publicSurvey.url === 'string') {
+            setPublicLink(publicSurvey.url);
+          }
+        } catch (err) {
+          console.log('No public survey link available');
         }
         
         setLoading(false);
@@ -81,7 +122,31 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
     }
 
     fetchSurvey();
-  }, [params, router, toast]);
+  }, [params, router, toast, t, i18n]);
+
+  const copyToClipboard = () => {
+    if (!publicLink) return;
+    
+    navigator.clipboard.writeText(publicLink)
+      .then(() => {
+        setCopied(true);
+        toast({
+          title: t('success.copied'),
+          description: t('success.linkCopied'),
+        });
+        
+        // Reset copied state after 2 seconds
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err);
+        toast({
+          variant: 'destructive',
+          title: t('errors.error'),
+          description: t('errors.copyFailed'),
+        });
+      });
+  };
 
   if (loading) {
     return (
@@ -162,28 +227,17 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
         {/* Basic Info */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
-          <div className="grid gap-4">
+          <div className="space-y-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Description</h3>
-              <p className="mt-1">{survey.description || 'No description provided'}</p>
+              <h3 className="text-lg font-semibold mb-2">Title</h3>
+              <p className="text-gray-600">{survey.title}</p>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+            {survey.description && (
               <div>
-                <h3 className="text-sm font-medium text-gray-500">Status</h3>
-                <Badge variant={survey.is_active ? "default" : "secondary"} className="mt-1">
-                  {survey.is_active ? 'Active' : 'Inactive'}
-                </Badge>
+                <h3 className="text-lg font-semibold mb-2">Description</h3>
+                <p className="text-gray-600">{survey.description}</p>
               </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Languages</h3>
-                <div className="flex gap-2 mt-1">
-                  {survey.languages.map(lang => (
-                    <Badge key={lang} variant="outline">{lang.toUpperCase()}</Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         </Card>
 
@@ -220,25 +274,23 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
           </div>
         </Card>
 
-        {/* Project Details */}
+        {/* Project Info */}
         <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Project Details</h2>
-          <div className="grid grid-cols-2 gap-6">
+          <h2 className="text-xl font-semibold mb-4">Project Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Building Name</h3>
-              <p className="mt-1">{survey.building_name || '-'}</p>
+              <h3 className="text-lg font-semibold mb-2">Status</h3>
+              <Badge variant={survey.is_active ? "default" : "secondary"}>
+                {survey.is_active ? 'Active' : 'Inactive'}
+              </Badge>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Short ID</h3>
-              <p className="mt-1">{survey.title.substring(0, 10) || '-'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Project Description</h3>
-              <p className="mt-1">{survey.project_description || '-'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Token</h3>
-              <p className="mt-1">{survey.token || '-'}</p>
+              <h3 className="text-lg font-semibold mb-2">Languages</h3>
+              <div className="flex gap-2">
+                {survey.languages.map(lang => (
+                  <Badge key={lang} variant="outline">{lang.toUpperCase()}</Badge>
+                ))}
+              </div>
             </div>
           </div>
         </Card>
@@ -352,25 +404,17 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
           </Card>
         )}
 
-        {/* Location */}
+        {/* Location Information */}
         <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Location</h2>
-          <div className="grid grid-cols-2 gap-6">
+          <h2 className="text-xl font-semibold mb-4">Location Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Street</h3>
-              <p className="mt-1">{survey.street || '-'}</p>
+              <p className="text-sm text-gray-500">City</p>
+              <p className="text-gray-600">{survey.city || 'Not specified'}</p>
             </div>
             <div>
-              <h3 className="text-sm font-medium text-gray-500">Postal Code</h3>
-              <p className="mt-1">{survey.postal_code || '-'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">City</h3>
-              <p className="mt-1">{survey.city || '-'}</p>
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-500">Country</h3>
-              <p className="mt-1">{survey.country || '-'}</p>
+              <p className="text-sm text-gray-500">Country</p>
+              <p className="text-gray-600">{survey.country || 'Not specified'}</p>
             </div>
           </div>
         </Card>
@@ -393,18 +437,18 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
             <h3 className="text-lg font-semibold mb-2">Survey Dates</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-500">Expiry Date</p>
+                <p className="text-sm text-gray-500">Start Date & Time</p>
                 <p className="text-gray-600">
-                  {survey?.expiry_date 
-                    ? new Date(survey.expiry_date).toLocaleDateString() 
+                  {survey?.start_datetime 
+                    ? new Date(survey.start_datetime).toLocaleString() 
                     : 'Not set'}
                 </p>
               </div>
               <div>
-                <p className="text-sm text-gray-500">Analysis End Date</p>
+                <p className="text-sm text-gray-500">End Date & Time</p>
                 <p className="text-gray-600">
-                  {survey?.analysis_end_date 
-                    ? new Date(survey.analysis_end_date).toLocaleDateString() 
+                  {survey?.expiry_date 
+                    ? new Date(survey.expiry_date).toLocaleString() 
                     : 'Not set'}
                 </p>
               </div>
@@ -412,17 +456,47 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
           </div>
         </Card>
 
-        {/* Max Participants */}
-        <Card className="p-6">
-          <h2 className="text-xl font-semibold mb-4">Max Participants</h2>
-          <p className="mt-1">{survey.max_participants || 'Unlimited'}</p>
-        </Card>
-
         {/* Analysis Cluster */}
         <Card className="p-6">
           <h2 className="text-xl font-semibold mb-4">Analysis Cluster</h2>
           <p className="mt-1">{survey.analysis_cluster || 'Standard'}</p>
         </Card>
+
+        {/* Public Link */}
+        {publicLink && (
+          <Card className="p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold">Public Link</h2>
+              <Badge variant="outline">
+                {copied ? <CheckIcon className="h-4 w-4 text-green-500" /> : 'Copy'}
+              </Badge>
+            </div>
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-sm font-medium text-gray-500">Public Survey Link</h3>
+                <div className="mt-1">
+                  <a 
+                    href={publicLink}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline break-all"
+                  >
+                    {publicLink}
+                  </a>
+                </div>
+                <div className="mt-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyToClipboard}
+                  >
+                    {copied ? t('success.copied') : t('actions.copy')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );

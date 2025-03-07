@@ -1,0 +1,20 @@
+{
+  "app": {
+    "name": "miMensajeRápido",
+    "switchLanguage": "Idioma"
+  },
+  "sidebar": {
+    "dashboard": "Panel de control",
+    "surveys": "Encuestas",
+    "analytics": "Análisis",
+    "users": "Usuarios",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión"
+  },
+  "languages": {
+    "en": "Inglés",
+    "fr": "Francés",
+    "es": "Español",
+    "de": "Alemán"
+  }
+} 

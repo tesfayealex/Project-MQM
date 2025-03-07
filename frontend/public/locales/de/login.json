@@ -1,0 +1,13 @@
+{
+  "title": "Willkommen zurück",
+  "subtitle": "Melden Sie sich in Ihrem Konto an",
+  "email": "E-Mail",
+  "password": "Passwort",
+  "signin": "Anmelden",
+  "signingIn": "Anmeldung läuft...",
+  "errors": {
+    "invalidCredentials": "Ungültige E-Mail oder Passwort",
+    "sessionExpired": "Ihre Sitzung ist abgelaufen. Bitte melden Sie sich erneut an.",
+    "unknown": "Bei der Anmeldung ist ein Fehler aufgetreten"
+  }
+} 

@@ -1,0 +1,13 @@
+{
+  "title": "Bon retour",
+  "subtitle": "Connectez-vous à votre compte",
+  "email": "Email",
+  "password": "Mot de passe",
+  "signin": "Se connecter",
+  "signingIn": "Connexion en cours...",
+  "errors": {
+    "invalidCredentials": "Email ou mot de passe invalide",
+    "sessionExpired": "Votre session a expiré. Veuillez vous reconnecter.",
+    "unknown": "Une erreur s'est produite lors de la connexion"
+  }
+} 

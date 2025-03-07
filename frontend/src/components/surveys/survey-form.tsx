@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Survey } from '@/types/survey';
 import { createSurvey, updateSurvey } from '@/lib/services/survey-service';
 import { useToast } from '@/components/ui/use-toast';
@@ -19,21 +18,32 @@ import { handleAuthError } from '@/lib/auth-utils';
 const surveySchema = z.object({
   title: z.string().min(1, 'Title is required'),
   description: z.string().optional(),
-  languages: z.array(z.string()).min(1, 'At least one language is required'),
-  format: z.enum(['online', 'face_to_face']),
-  type: z.enum(['friends_family', 'public', 'professional', 'single_company', 'intracompany']),
-  max_participants: z.number().optional(),
-  end_date: z.string().optional(),
-  analysis_end_date: z.string().optional(),
-  analysis_cluster: z.enum(['Standard', 'CoreNet Event', 'Event & Conference', 'HomeOffice']).optional(),
-  building_name: z.string().optional(),
-  short_id: z.string().optional(),
-  project_description: z.string().optional(),
-  street_number: z.string().optional(),
-  city_code: z.string().optional(),
+  headlines: z.record(z.string()).optional(),
+  survey_texts: z.record(z.string()).optional(),
+  end_survey_titles: z.record(z.string()).optional(),
+  end_survey_texts: z.record(z.string()).optional(),
+  expired_survey_titles: z.record(z.string()).optional(),
+  expired_survey_texts: z.record(z.string()).optional(),
+  end_survey_title: z.string().optional(),
+  end_survey_text: z.string().optional(),
+  expired_survey_title: z.string().optional(),
+  expired_survey_text: z.string().optional(),
+  languages: z.array(z.string()).min(1, "At least one language is required"),
+  format: z.string(),
+  type: z.string(),
+  start_datetime: z.string().optional(),
+  expiry_date: z.string().optional(),
+  analysis_cluster: z.string().optional(),
   city: z.string().optional(),
   country: z.string().optional(),
-  token: z.string().optional(),
+  token: z.string().optional(), // Legacy token field
+  tokens: z.array(
+    z.object({
+      id: z.number(),
+      token: z.string(),
+      description: z.string()
+    })
+  ).optional(),
   is_active: z.boolean().default(true),
   questions: z.array(z.object({
     type: z.enum(['nps', 'free_text']),
@@ -49,58 +59,54 @@ const surveySchema = z.object({
 type SurveyFormValues = z.infer<typeof surveySchema>;
 
 interface SurveyFormProps {
-  initialData?: Survey;
-  onSuccess?: () => void;
+  initialData?: Partial<Survey>;
+  onSubmit: (data: Partial<Survey>) => void;
+  isLoading?: boolean;
 }
 
-export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) {
+export default function SurveyForm({ initialData, onSubmit, isLoading = false }: SurveyFormProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [endDate, setEndDate] = useState<Date | undefined>(
-    initialData?.end_date ? new Date(initialData.end_date) : undefined
-  );
-  const [analysisEndDate, setAnalysisEndDate] = useState<Date | undefined>(
-    initialData?.analysis_end_date ? new Date(initialData.analysis_end_date) : undefined
-  );
 
-  const form = useForm<SurveyFormValues>({
+  const methods = useForm<SurveyFormValues>({
     resolver: zodResolver(surveySchema),
     defaultValues: {
+      ...initialData,
+      languages: initialData?.languages || ['en'],
       title: initialData?.title || '',
       description: initialData?.description || '',
-      languages: initialData?.languages || ['en'],
+      headlines: initialData?.headlines || {},
+      survey_texts: initialData?.survey_texts || {},
+      is_active: initialData?.is_active ?? true,
       format: initialData?.format || 'online',
       type: initialData?.type || 'public',
-      max_participants: initialData?.max_participants || 100,
-      end_date: initialData?.end_date,
-      analysis_end_date: initialData?.analysis_end_date,
+      start_datetime: initialData?.start_datetime || '',
+      expiry_date: initialData?.expiry_date || '',
       analysis_cluster: initialData?.analysis_cluster || 'Standard',
-      building_name: initialData?.building_name || '',
-      short_id: initialData?.short_id || '',
-      project_description: initialData?.project_description || '',
-      street_number: initialData?.street_number || '',
-      city_code: initialData?.city_code || '',
       city: initialData?.city || '',
       country: initialData?.country || '',
       token: initialData?.token || '',
-      is_active: initialData?.is_active ?? true,
-      questions: initialData?.questions || []
+      tokens: initialData?.tokens?.map(token => ({
+        ...token,
+        id: token.id
+      })) || []
     }
   });
 
-  const onSubmit = async (data: SurveyFormValues) => {
+  const handleSubmit = async (data: SurveyFormValues) => {
     setIsSubmitting(true);
     try {
-      // Convert dates to ISO strings if they exist
-      const formattedData = {
+      const formattedData: Partial<Survey> = {
         ...data,
-        end_date: endDate?.toISOString(),
-        analysis_end_date: analysisEndDate?.toISOString()
+        tokens: data.tokens?.map(token => ({
+          ...token,
+          id: token.id
+        }))
       };
-
+      
       if (initialData?.id) {
-        await updateSurvey(initialData.id, formattedData);
+        await updateSurvey(initialData.id.toString(), formattedData);
         toast({
           title: "Success",
           description: "Survey updated successfully",
@@ -113,11 +119,7 @@ export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) 
         });
       }
       
-      if (onSuccess) {
-        onSuccess();
-      } else {
-        router.push('/dashboard/surveys');
-      }
+      await onSubmit(formattedData);
     } catch (error: any) {
       console.error('Error submitting survey:', error);
       
@@ -135,17 +137,17 @@ export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) 
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+    <form onSubmit={methods.handleSubmit(handleSubmit)} className="space-y-8">
       <div className="space-y-4">
         <div>
           <Label htmlFor="title">Title</Label>
           <Input
             id="title"
-            {...form.register('title')}
+            {...methods.register('title')}
             placeholder="Enter survey title"
           />
-          {form.formState.errors.title && (
-            <p className="text-sm text-red-500 mt-1">{form.formState.errors.title.message}</p>
+          {methods.formState.errors.title && (
+            <p className="text-sm text-red-500 mt-1">{methods.formState.errors.title.message}</p>
           )}
         </div>
 
@@ -153,7 +155,7 @@ export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) 
           <Label htmlFor="description">Description</Label>
           <Textarea
             id="description"
-            {...form.register('description')}
+            {...methods.register('description')}
             placeholder="Enter survey description"
           />
         </div>
@@ -163,7 +165,7 @@ export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) 
             <Label htmlFor="format">Format</Label>
             <select
               id="format"
-              {...form.register('format')}
+              {...methods.register('format')}
               className="w-full p-2 border rounded"
             >
               <option value="online">Online</option>
@@ -175,7 +177,7 @@ export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) 
             <Label htmlFor="type">Type</Label>
             <select
               id="type"
-              {...form.register('type')}
+              {...methods.register('type')}
               className="w-full p-2 border rounded"
             >
               <option value="public">Public</option>
@@ -189,42 +191,28 @@ export default function SurveyForm({ initialData, onSuccess }: SurveyFormProps) 
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="end_date">End Date</Label>
-            <DatePicker
-              date={endDate}
-              setDate={(date) => {
-                setEndDate(date);
-                form.setValue('end_date', date?.toISOString());
-              }}
+            <Label htmlFor="start_datetime">Start Date & Time</Label>
+            <Input
+              type="datetime-local"
+              id="start_datetime"
+              {...methods.register('start_datetime')}
             />
           </div>
-
           <div>
-            <Label htmlFor="analysis_end_date">Analysis End Date</Label>
-            <DatePicker
-              date={analysisEndDate}
-              setDate={(date) => {
-                setAnalysisEndDate(date);
-                form.setValue('analysis_end_date', date?.toISOString());
-              }}
+            <Label htmlFor="expiry_date">End Date & Time</Label>
+            <Input
+              type="datetime-local"
+              id="expiry_date"
+              {...methods.register('expiry_date')}
             />
           </div>
-        </div>
-
-        <div>
-          <Label htmlFor="max_participants">Maximum Participants</Label>
-          <Input
-            id="max_participants"
-            type="number"
-            {...form.register('max_participants', { valueAsNumber: true })}
-          />
         </div>
 
         <div>
           <Label>
             <input
               type="checkbox"
-              {...form.register('is_active')}
+              {...methods.register('is_active')}
               className="mr-2"
             />
             Active
