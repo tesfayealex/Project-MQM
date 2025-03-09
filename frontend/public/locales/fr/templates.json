@@ -1,0 +1,175 @@
+{
+  "list": {
+    "title": "Modèles",
+    "create": "Créer un modèle",
+    "description": "Les modèles vous aident à créer rapidement de nouvelles enquêtes avec des structures prédéfinies.",
+    "loading": "Chargement des modèles...",
+    "no_templates": "Aucun modèle trouvé.",
+    "languages": "Langues",
+    "type": "Type",
+    "created": "Créé",
+    "status": "Statut",
+    "actions": "Actions"
+  },
+  "detail": {
+    "title": "Détails du modèle",
+    "back": "Retour aux modèles",
+    "edit": "Modifier le modèle",
+    "delete": "Supprimer le modèle",
+    "created_by": "Créé par",
+    "created_on": "Créé le",
+    "last_updated": "Dernière mise à jour",
+    "languages": "Langues",
+    "type": "Type",
+    "format": "Format",
+    "status": "Statut",
+    "clusters": "Groupes de mots",
+    "no_clusters": "Aucun groupe de mots attribué",
+    "tabs": {
+      "info": "Informations",
+      "clusters": "Groupes de mots",
+      "questions": "Questions"
+    },
+    "basicInfo": "Informations de base",
+    "title": "Titre",
+    "description": "Description",
+    "status": "Statut",
+    "createdAt": "Créé le",
+    "updatedAt": "Mis à jour le",
+    "analysisCluster": "Cluster d'analyse",
+    "clusters": "Groupes de mots associés",
+    "noClusters": "Aucun groupe de mots associé à ce modèle",
+    "questions": "Questions",
+    "noQuestions": "Aucune question définie pour ce modèle",
+    "question": "Question",
+    "questionType": "Type",
+    "required": "Obligatoire"
+  },
+  "form": {
+    "tabs": {
+      "basicInfo": "Informations de base",
+      "questions": "Questions",
+      "clusters": "Groupes de mots"
+    },
+    "basicInfo": "Informations de base",
+    "basicInfoDesc": "Informations générales sur le modèle",
+    "title": "Titre",
+    "description": "Description",
+    "languages": "Langues",
+    "format": "Format",
+    "selectFormat": "Sélectionner un format",
+    "type": "Type",
+    "selectType": "Sélectionner un type",
+    "analysisCluster": "Cluster d'analyse",
+    "selectCluster": "Sélectionner un cluster",
+    "isActive": "Actif",
+    "multilingualContent": "Contenu multilingue",
+    "multilingualContentDesc": "Fournir du contenu dans différentes langues",
+    "headline": "Titre",
+    "content": "Contenu",
+    "startTitle": "Titre de départ",
+    "startText": "Texte de départ",
+    "endTitle": "Titre de fin",
+    "endText": "Texte de fin",
+    "expiredTitle": "Titre d'expiration",
+    "expiredText": "Texte d'expiration",
+    "questions": "Questions",
+    "questionsDesc": "Ajouter des questions à votre modèle",
+    "questionType": "Type de question",
+    "questionType_freeText": "Texte libre",
+    "questionType_nps": "NPS (0-10)",
+    "isRequired": "Obligatoire",
+    "questionText": "Texte de la question",
+    "questionTextPlaceholder": "Entrez votre question",
+    "placeholderText": "Texte d'exemple",
+    "placeholderTextPlaceholder": "Entrez le texte d'exemple",
+    "addQuestion": "Ajouter une question",
+    "noQuestions": "Aucune question ajoutée. Cliquez sur le bouton ci-dessus pour ajouter une question.",
+    "wordClusters": "Groupes de mots",
+    "wordClustersDesc": "Associer ce modèle à des groupes de mots pour l'analyse",
+    "selectedClusters": "Groupes sélectionnés",
+    "noClustersSelected": "Aucun groupe sélectionné",
+    "addCluster": "Ajouter un groupe",
+    "selectClusterToAdd": "Sélectionner un groupe à ajouter",
+    "createNewCluster": "Créer un nouveau groupe",
+    "newClusterName": "Nom du nouveau groupe",
+    "addNewCluster": "Ajouter",
+    "clusterList": "Groupes associés",
+    "noClusterAssigned": "Aucun groupe n'est encore attribué à ce modèle",
+    "keywords": "Mots-clés",
+    "save": "Enregistrer le modèle",
+    "saving": "Enregistrement...",
+    "settings": "Paramètres"
+  },
+  "format": {
+    "online": "En ligne",
+    "faceToFace": "Face à face"
+  },
+  "type": {
+    "public": "Public",
+    "friendsFamily": "Amis et famille",
+    "professional": "Professionnel",
+    "singleCompany": "Entreprise unique",
+    "intracompany": "Intra-entreprise"
+  },
+  "analysisCluster": {
+    "standard": "Standard",
+    "corenetEvent": "Événement CoreNet",
+    "eventConference": "Événement et conférence",
+    "homeOffice": "Bureau à domicile"
+  },
+  "status": {
+    "active": "Actif",
+    "inactive": "Inactif"
+  },
+  "messages": {
+    "confirm_delete": "Êtes-vous sûr de vouloir supprimer ce modèle ?",
+    "error": "Une erreur s'est produite",
+    "deleted": "Modèle supprimé",
+    "createSuccess": "Modèle créé avec succès",
+    "createError": "Erreur lors de la création du modèle",
+    "updateSuccess": "Modèle mis à jour avec succès",
+    "updateError": "Erreur lors de la mise à jour du modèle",
+    "deleteSuccess": "Modèle supprimé avec succès",
+    "deleteError": "Erreur lors de la suppression du modèle",
+    "loadError": "Erreur lors du chargement du modèle",
+    "clusterAdded": "Groupe ajouté",
+    "existingClusterAdded": "Un groupe existant avec le même nom a été ajouté",
+    "clusterAlreadyAdded": "Groupe déjà ajouté",
+    "clusterAlreadyAddedDesc": "Ce groupe est déjà dans votre sélection",
+    "clusterCreated": "Groupe créé",
+    "clusterCreatedDesc": "Un nouveau groupe a été créé et ajouté à votre sélection",
+    "clusterCreateError": "Erreur lors de la création du groupe"
+  },
+  "success": {
+    "created": "Modèle créé",
+    "templateCreated": "Le modèle a été créé avec succès",
+    "updated": "Modèle mis à jour",
+    "templateUpdated": "Le modèle a été mis à jour avec succès",
+    "deleted": "Modèle supprimé",
+    "templateDeleted": "Le modèle a été supprimé avec succès"
+  },
+  "errors": {
+    "error": "Erreur",
+    "fetchFailed": "Impossible de charger le modèle",
+    "createFailed": "Impossible de créer le modèle",
+    "updateFailed": "Impossible de mettre à jour le modèle",
+    "deleteFailed": "Impossible de supprimer le modèle"
+  },
+  "defaults": {
+    "untitledTemplate": "Modèle sans titre"
+  },
+  "actions": {
+    "view": "Voir le modèle",
+    "edit": "Modifier",
+    "delete": "Supprimer"
+  },
+  "confirm": {
+    "delete": {
+      "title": "Supprimer le modèle",
+      "message": "Êtes-vous sûr de vouloir supprimer ce modèle ?",
+      "cancel": "Annuler",
+      "confirm": "Supprimer"
+    }
+  }
+} 

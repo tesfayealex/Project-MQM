@@ -12,10 +12,12 @@ declare module "next-auth" {
       id: number
       name: string
     }>
+    accessToken?: string
   }
 
   interface Session {
     user: User
+    accessToken?: string
   }
 }
 
@@ -30,5 +32,6 @@ declare module "next-auth/jwt" {
       id: number
       name: string
     }>
+    accessToken?: string
   }
 } 

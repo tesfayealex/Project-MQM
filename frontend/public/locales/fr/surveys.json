@@ -263,6 +263,25 @@
       "generate": "Générer",
       "remove": "Supprimer",
       "saving": "Enregistrement..."
-    }
+    },
+    "templateSelect": "Modèle",
+    "selectTemplate": "Sélectionner un modèle",
+    "applyTemplate": "Appliquer le modèle",
+    "applyTemplateConfirmTitle": "Appliquer le modèle",
+    "applyTemplateConfirm": "Cela remplacera les valeurs existantes par les données du modèle. Êtes-vous sûr de vouloir continuer?",
+    "save": "Enregistrer l'enquête",
+    "saving": "Enregistrement..."
+  },
+  "success": {
+    "created": "Enquête créée",
+    "surveyCreated": "Votre enquête a été créée avec succès.",
+    "updated": "Enquête mise à jour",
+    "surveyUpdated": "Votre enquête a été mise à jour avec succès.",
+    "deleted": "Enquête supprimée",
+    "surveyDeleted": "Votre enquête a été supprimée avec succès.",
+    "tokenCreated": "Token créé",
+    "tokenDeleted": "Token supprimé",
+    "templateApplied": "Modèle appliqué",
+    "templateAppliedDesc": "Le modèle a été appliqué à votre enquête."
   }
 }

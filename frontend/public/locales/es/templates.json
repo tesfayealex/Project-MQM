@@ -1,0 +1,175 @@
+{
+  "list": {
+    "title": "Plantillas",
+    "create": "Crear Plantilla",
+    "description": "Las plantillas te ayudan a crear rápidamente nuevas encuestas con estructuras predefinidas.",
+    "loading": "Cargando plantillas...",
+    "no_templates": "No se encontraron plantillas.",
+    "languages": "Idiomas",
+    "type": "Tipo",
+    "created": "Creada",
+    "status": "Estado",
+    "actions": "Acciones"
+  },
+  "detail": {
+    "title": "Detalles de la Plantilla",
+    "back": "Volver a Plantillas",
+    "edit": "Editar Plantilla",
+    "delete": "Eliminar Plantilla",
+    "created_by": "Creada por",
+    "created_on": "Creada el",
+    "last_updated": "Última actualización",
+    "languages": "Idiomas",
+    "type": "Tipo",
+    "format": "Formato",
+    "status": "Estado",
+    "clusters": "Grupos de Palabras",
+    "no_clusters": "No hay grupos de palabras asignados",
+    "tabs": {
+      "info": "Información",
+      "clusters": "Grupos de Palabras",
+      "questions": "Preguntas"
+    },
+    "basicInfo": "Información Básica",
+    "title": "Título",
+    "description": "Descripción",
+    "status": "Estado",
+    "createdAt": "Creada el",
+    "updatedAt": "Actualizada el",
+    "analysisCluster": "Grupo de Análisis",
+    "clusters": "Grupos de Palabras Asociados",
+    "noClusters": "No hay grupos de palabras asociados a esta plantilla",
+    "questions": "Preguntas",
+    "noQuestions": "No hay preguntas definidas para esta plantilla",
+    "question": "Pregunta",
+    "questionType": "Tipo",
+    "required": "Obligatoria"
+  },
+  "form": {
+    "tabs": {
+      "basicInfo": "Información Básica",
+      "questions": "Preguntas",
+      "clusters": "Grupos de Palabras"
+    },
+    "basicInfo": "Información Básica",
+    "basicInfoDesc": "Información general sobre la plantilla",
+    "title": "Título",
+    "description": "Descripción",
+    "languages": "Idiomas",
+    "format": "Formato",
+    "selectFormat": "Seleccionar formato",
+    "type": "Tipo",
+    "selectType": "Seleccionar tipo",
+    "analysisCluster": "Grupo de Análisis",
+    "selectCluster": "Seleccionar grupo",
+    "isActive": "Activa",
+    "multilingualContent": "Contenido Multilingüe",
+    "multilingualContentDesc": "Proporcionar contenido en diferentes idiomas",
+    "headline": "Título",
+    "content": "Contenido",
+    "startTitle": "Título de Inicio",
+    "startText": "Texto de Inicio",
+    "endTitle": "Título de Finalización",
+    "endText": "Texto de Finalización",
+    "expiredTitle": "Título de Expiración",
+    "expiredText": "Texto de Expiración",
+    "questions": "Preguntas",
+    "questionsDesc": "Añadir preguntas a tu plantilla",
+    "questionType": "Tipo de Pregunta",
+    "questionType_freeText": "Texto Libre",
+    "questionType_nps": "NPS (0-10)",
+    "isRequired": "Obligatoria",
+    "questionText": "Texto de la Pregunta",
+    "questionTextPlaceholder": "Introduce tu pregunta",
+    "placeholderText": "Texto del Marcador de Posición",
+    "placeholderTextPlaceholder": "Introduce el texto del marcador de posición",
+    "addQuestion": "Añadir Pregunta",
+    "noQuestions": "Aún no se han añadido preguntas. Haz clic en el botón de arriba para añadir una pregunta.",
+    "wordClusters": "Grupos de Palabras",
+    "wordClustersDesc": "Asocia esta plantilla con grupos de palabras para análisis",
+    "selectedClusters": "Grupos Seleccionados",
+    "noClustersSelected": "Aún no se han seleccionado grupos",
+    "addCluster": "Añadir Grupo",
+    "selectClusterToAdd": "Selecciona un grupo para añadir",
+    "createNewCluster": "Crear nuevo grupo",
+    "newClusterName": "Nombre del nuevo grupo",
+    "addNewCluster": "Añadir",
+    "clusterList": "Grupos Asociados",
+    "noClusterAssigned": "Aún no hay grupos asignados a esta plantilla",
+    "keywords": "Palabras Clave",
+    "save": "Guardar Plantilla",
+    "saving": "Guardando...",
+    "settings": "Configuración"
+  },
+  "format": {
+    "online": "En línea",
+    "faceToFace": "Cara a Cara"
+  },
+  "type": {
+    "public": "Público",
+    "friendsFamily": "Amigos y Familia",
+    "professional": "Profesional",
+    "singleCompany": "Empresa Única",
+    "intracompany": "Intraempresa"
+  },
+  "analysisCluster": {
+    "standard": "Estándar",
+    "corenetEvent": "Evento CoreNet",
+    "eventConference": "Evento y Conferencia",
+    "homeOffice": "Oficina en Casa"
+  },
+  "status": {
+    "active": "Activa",
+    "inactive": "Inactiva"
+  },
+  "messages": {
+    "confirm_delete": "¿Estás seguro de que quieres eliminar esta plantilla?",
+    "error": "Ha ocurrido un error",
+    "deleted": "Plantilla eliminada",
+    "createSuccess": "Plantilla creada con éxito",
+    "createError": "Error al crear la plantilla",
+    "updateSuccess": "Plantilla actualizada con éxito",
+    "updateError": "Error al actualizar la plantilla",
+    "deleteSuccess": "Plantilla eliminada con éxito",
+    "deleteError": "Error al eliminar la plantilla",
+    "loadError": "Error al cargar la plantilla",
+    "clusterAdded": "Grupo añadido",
+    "existingClusterAdded": "Se añadió un grupo existente con el mismo nombre",
+    "clusterAlreadyAdded": "Grupo ya añadido",
+    "clusterAlreadyAddedDesc": "Este grupo ya está en tu selección",
+    "clusterCreated": "Grupo creado",
+    "clusterCreatedDesc": "Se ha creado un nuevo grupo y se ha añadido a tu selección",
+    "clusterCreateError": "Error al crear el grupo"
+  },
+  "success": {
+    "created": "Plantilla Creada",
+    "templateCreated": "La plantilla se ha creado con éxito",
+    "updated": "Plantilla Actualizada",
+    "templateUpdated": "La plantilla se ha actualizado con éxito",
+    "deleted": "Plantilla Eliminada",
+    "templateDeleted": "La plantilla se ha eliminado con éxito"
+  },
+  "errors": {
+    "error": "Error",
+    "fetchFailed": "No se pudo cargar la plantilla",
+    "createFailed": "No se pudo crear la plantilla",
+    "updateFailed": "No se pudo actualizar la plantilla",
+    "deleteFailed": "No se pudo eliminar la plantilla"
+  },
+  "defaults": {
+    "untitledTemplate": "Plantilla sin título"
+  },
+  "actions": {
+    "view": "Ver Plantilla",
+    "edit": "Editar",
+    "delete": "Eliminar"
+  },
+  "confirm": {
+    "delete": {
+      "title": "Eliminar Plantilla",
+      "message": "¿Estás seguro de que quieres eliminar esta plantilla?",
+      "cancel": "Cancelar",
+      "confirm": "Eliminar"
+    }
+  }
+} 

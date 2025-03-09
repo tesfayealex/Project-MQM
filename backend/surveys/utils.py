@@ -335,13 +335,14 @@ def process_text(text, language='en'):
         logger.error(f"Error processing text: {str(e)}")
         return processed_words
 
-def assign_clusters_to_words(text, processed_words, language='en'):
+def assign_clusters_to_words(text, processed_words, language='en', survey=None):
     """
     Assign clusters to words without saving to the database
     Args:
         text: The text to process
         processed_words: List of already processed words
         language: Language code of the text
+        survey: Survey model instance (optional) - if provided, will prioritize clusters from its template
     Returns:
         Dictionary mapping words to their assigned clusters
     """
@@ -352,7 +353,18 @@ def assign_clusters_to_words(text, processed_words, language='en'):
     
     try:
         # Get custom clusters to use for assignment
-        clusters = list(CustomWordCluster.objects.filter(is_active=True).values_list('name', flat=True))
+        clusters = []
+        
+        # If survey is provided and has a template, prioritize the template's clusters
+        if survey and survey.template:
+            template_clusters = list(survey.template.clusters.filter(is_active=True).values_list('name', flat=True))
+            if template_clusters:
+                clusters = template_clusters
+                
+        # If no template clusters were found, fall back to all active clusters
+        if not clusters:
+            clusters = list(CustomWordCluster.objects.filter(is_active=True).values_list('name', flat=True))
+            
         if not clusters:
             logger.warning("No active custom clusters found for assignment")
             clusters = ["Other"]  # Default if no custom clusters exist
@@ -539,18 +551,32 @@ def process_survey_and_assign_clusters(response_id):
     try:
         # Get the response and its associated answer and survey
         response = Response.objects.get(id=response_id)
+        survey = response.survey
         
         # Verify response has text answers to process
         if not response.answers.filter(text_answer__isnull=False).exists():
             logger.warning(f"Response {response_id} has no text answers to process")
             return
             
-        # Get custom clusters to use for assignment
-        clusters = list(CustomWordCluster.objects.filter(is_active=True).values_list('name', flat=True))
+        # Get clusters to use for assignment
+        clusters = []
+        
+        # If survey has a template, prioritize the template's clusters
+        if survey.template:
+            template_clusters = list(survey.template.clusters.filter(is_active=True).values_list('name', flat=True))
+            if template_clusters:
+                clusters = template_clusters
+                logger.info(f"Using {len(clusters)} clusters from template for response {response_id}")
+        
+        # If no template clusters were found, fall back to all active clusters
+        if not clusters:
+            clusters = list(CustomWordCluster.objects.filter(is_active=True).values_list('name', flat=True))
+            logger.info(f"Using {len(clusters)} active clusters for response {response_id}")
+            
         if not clusters:
             logger.warning("No active custom clusters found for assignment")
             clusters = []  # Default if no custom clusters exist
-            
+        
         # Process each text answer in the response
         for answer in response.answers.filter(text_answer__isnull=False):
             # Skip empty answers

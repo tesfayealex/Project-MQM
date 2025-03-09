@@ -1,11 +1,20 @@
 from rest_framework import serializers
-from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster
+from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster, Template, TemplateQuestion
 from django.db import models
 
 
 class QuestionSerializer(serializers.ModelSerializer):
     class Meta:
         model = Question
+        fields = [
+            'id', 'questions', 'placeholders', 'type', 'order', 'is_required', 'language', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+
+class TemplateQuestionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TemplateQuestion
         fields = [
             'id', 'questions', 'placeholders', 'type', 'order', 'is_required', 'language', 'created_at', 'updated_at'
         ]
@@ -33,12 +42,14 @@ class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     response_count = serializers.SerializerMethodField()
     tokens = SurveyTokenSerializer(many=True, read_only=True)
-    
+
     class Meta:
         model = Survey
         fields = [
             # Basic Info
             'id', 'title', 'description',
+            # Template Relationship
+            'template',
             # Multilingual Content
             'headlines', 'survey_texts',
             # Project Address
@@ -62,6 +73,9 @@ class SurveySerializer(serializers.ModelSerializer):
             'primary_token'
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at', 'response_count', 'primary_token']
+        extra_kwargs = {
+            'token': {'required': False, 'allow_blank': True, 'allow_null': True}
+        }
 
     def get_response_count(self, obj):
         """
@@ -73,6 +87,14 @@ class SurveySerializer(serializers.ModelSerializer):
         # Extract tokens data if present
         tokens_data = self.context.get('request').data.get('tokens', [])
         validated_data['created_by'] = self.context['request'].user
+
+        # Set a dummy value for the legacy token field to avoid issues
+        # We're not using this field anymore, but we need to set it to something unique
+        import random
+        import string
+        random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+        validated_data['token'] = random_token
+
         survey = super().create(validated_data)
         
         # Create tokens if provided
@@ -84,16 +106,6 @@ class SurveySerializer(serializers.ModelSerializer):
             )
         
         return survey
-
-    def validate_token(self, value):
-        """
-        Check that the token contains only lowercase letters, no special characters, no spaces.
-        """
-        if value and (not value.islower() or not value.isalnum()):
-            raise serializers.ValidationError(
-                "Token must contain only lowercase letters and numbers, no special characters or spaces."
-            )
-        return value
 
     def validate_languages(self, value):
         """
@@ -108,6 +120,13 @@ class SurveySerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance, validated_data):
+        # Set a unique dummy value for the legacy token field
+        # We're not using this field anymore, but we need to set it to something unique
+        import random
+        import string
+        random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+        validated_data['token'] = random_token
+            
         # Update the survey instance
         survey = super().update(instance, validated_data)
         
@@ -379,4 +398,117 @@ class SurveyDetailSerializer(SurveySerializer):
                 Question.objects.create(survey=survey, order=order, **question_data)
                 
         return survey
+
+
+class TemplateSerializer(serializers.ModelSerializer):
+    clusters = CustomWordClusterSerializer(many=True, read_only=True)
+    questions = TemplateQuestionSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Template
+        fields = [
+            # Basic Info
+            'id', 'title', 'description',
+            # Multilingual Content
+            'headlines', 'survey_texts',
+            # Project Details
+            'languages', 'format', 'type', 'analysis_cluster',
+            # End Survey Information
+            'start_survey_titles', 'start_survey_texts', 'end_survey_titles', 'end_survey_texts', 'expired_survey_titles', 'expired_survey_texts',
+            # Metadata
+            'created_by', 'created_at', 'updated_at', 'is_active',
+            # Related
+            'clusters', 'questions',
+        ]
+        read_only_fields = ['created_by', 'created_at', 'updated_at']
+
+    def create(self, validated_data):
+        # Get the current user from the context
+        request = self.context.get('request')
+        if request and hasattr(request, 'user'):
+            validated_data['created_by'] = request.user
+        return super().create(validated_data)
+
+
+class TemplateDetailSerializer(TemplateSerializer):
+    """
+    Serializer for detailed template view, allows managing clusters and questions.
+    """
+    # Override the field to handle both representations of clusters
+    clusters = CustomWordClusterSerializer(many=True, required=False)
+    questions = TemplateQuestionSerializer(many=True, required=False)
+    
+    def to_internal_value(self, data):
+        """
+        Handle both formats of clusters:
+        1. List of full cluster objects with IDs
+        2. List of cluster IDs
+        """
+        ret = super().to_internal_value(data)
+        
+        # Process clusters data if present
+        if 'clusters' in data:
+            cluster_ids = []
+            
+            if isinstance(data['clusters'], list):
+                for cluster in data['clusters']:
+                    if isinstance(cluster, dict) and 'id' in cluster:
+                        cluster_ids.append(cluster['id'])
+                    elif isinstance(cluster, (int, str)):
+                        cluster_ids.append(int(cluster))
+            
+            if cluster_ids:
+                # Get the actual custom cluster objects
+                ret['clusters'] = CustomWordCluster.objects.filter(id__in=cluster_ids)
+        
+        return ret
+
+    def update(self, instance, validated_data):
+        # Handle clusters (ManyToMany relationship)
+        clusters_data = validated_data.pop('clusters', None)
+        
+        # Handle questions (nested serializer)
+        questions_data = validated_data.pop('questions', None)
+        if questions_data is None and 'questions' in self.initial_data:
+            # Extract questions data from initial_data if not in validated_data
+            questions_data = self.initial_data.get('questions', [])
+        
+        # Update the template instance with the remaining data
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        
+        # Set clusters if provided
+        if clusters_data is not None:
+            print(f"Setting clusters: {clusters_data}")
+            instance.clusters.set(clusters_data)
+            
+        # Update questions if provided
+        if questions_data:
+            # Delete existing questions
+            instance.questions.all().delete()
+            
+            # Create new questions
+            for question_data in questions_data:
+                # Ensure we have required fields
+                if not isinstance(question_data, dict):
+                    continue
+                    
+                if 'order' not in question_data:
+                    question_data['order'] = 1
+                if 'type' not in question_data:
+                    question_data['type'] = 'free_text'
+                if 'questions' not in question_data:
+                    question_data['questions'] = {}
+                    
+                TemplateQuestion.objects.create(template=instance, **question_data)
+        
+        return instance
+
+
+class SurveyWithTemplateSerializer(SurveySerializer):
+    template_detail = TemplateSerializer(source='template', read_only=True)
+    
+    class Meta(SurveySerializer.Meta):
+        fields = SurveySerializer.Meta.fields + ['template_detail']
 

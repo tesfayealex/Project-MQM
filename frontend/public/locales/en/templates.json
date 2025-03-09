@@ -1,0 +1,175 @@
+{
+  "list": {
+    "title": "Templates",
+    "create": "Create Template",
+    "description": "Templates help you quickly create new surveys with predefined structures.",
+    "loading": "Loading templates...",
+    "no_templates": "No templates found.",
+    "languages": "Languages",
+    "type": "Type",
+    "created": "Created",
+    "status": "Status",
+    "actions": "Actions"
+  },
+  "detail": {
+    "title": "Template Details",
+    "back": "Back to Templates",
+    "edit": "Edit Template",
+    "delete": "Delete Template",
+    "created_by": "Created by",
+    "created_on": "Created on",
+    "last_updated": "Last updated",
+    "languages": "Languages",
+    "type": "Type",
+    "format": "Format",
+    "status": "Status",
+    "clusters": "Word Clusters",
+    "no_clusters": "No word clusters assigned",
+    "tabs": {
+      "info": "Information",
+      "clusters": "Word Clusters",
+      "questions": "Questions"
+    },
+    "basicInfo": "Basic Information",
+    "title": "Title",
+    "description": "Description",
+    "status": "Status",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At",
+    "analysisCluster": "Analysis Cluster",
+    "clusters": "Associated Word Clusters",
+    "noClusters": "No word clusters associated with this template",
+    "questions": "Questions",
+    "noQuestions": "No questions defined for this template",
+    "question": "Question",
+    "questionType": "Type",
+    "required": "Required"
+  },
+  "form": {
+    "tabs": {
+      "basicInfo": "Basic Information",
+      "questions": "Questions",
+      "clusters": "Word Clusters"
+    },
+    "basicInfo": "Basic Information",
+    "basicInfoDesc": "General information about the template",
+    "title": "Title",
+    "description": "Description",
+    "languages": "Languages",
+    "format": "Format",
+    "selectFormat": "Select a format",
+    "type": "Type",
+    "selectType": "Select a type",
+    "analysisCluster": "Analysis Cluster",
+    "selectCluster": "Select a cluster",
+    "isActive": "Active",
+    "multilingualContent": "Multilingual Content",
+    "multilingualContentDesc": "Provide content in different languages",
+    "headline": "Headline",
+    "content": "Content",
+    "startTitle": "Start Title",
+    "startText": "Start Text",
+    "endTitle": "End Title",
+    "endText": "End Text",
+    "expiredTitle": "Expired Title",
+    "expiredText": "Expired Text",
+    "questions": "Questions",
+    "questionsDesc": "Add questions to your template",
+    "questionType": "Question Type",
+    "questionType_freeText": "Free Text",
+    "questionType_nps": "NPS (0-10)",
+    "isRequired": "Required",
+    "questionText": "Question Text",
+    "questionTextPlaceholder": "Enter your question",
+    "placeholderText": "Placeholder Text",
+    "placeholderTextPlaceholder": "Enter placeholder text",
+    "addQuestion": "Add Question",
+    "noQuestions": "No questions added yet. Click the button above to add a question.",
+    "wordClusters": "Word Clusters",
+    "wordClustersDesc": "Associate this template with word clusters for analysis",
+    "selectedClusters": "Selected Clusters",
+    "noClustersSelected": "No clusters selected yet",
+    "addCluster": "Add Cluster",
+    "selectClusterToAdd": "Select a cluster to add",
+    "createNewCluster": "Create new cluster",
+    "newClusterName": "New cluster name",
+    "addNewCluster": "Add",
+    "clusterList": "Associated Clusters",
+    "noClusterAssigned": "No clusters assigned to this template yet",
+    "keywords": "Keywords",
+    "save": "Save Template",
+    "saving": "Saving...",
+    "settings": "Settings"
+  },
+  "format": {
+    "online": "Online",
+    "faceToFace": "Face to Face"
+  },
+  "type": {
+    "public": "Public",
+    "friendsFamily": "Friends & Family",
+    "professional": "Professional",
+    "singleCompany": "Single Company",
+    "intracompany": "Intracompany"
+  },
+  "analysisCluster": {
+    "standard": "Standard",
+    "corenetEvent": "CoreNet Event",
+    "eventConference": "Event & Conference",
+    "homeOffice": "Home Office"
+  },
+  "status": {
+    "active": "Active",
+    "inactive": "Inactive"
+  },
+  "messages": {
+    "confirm_delete": "Are you sure you want to delete this template?",
+    "error": "An error occurred",
+    "deleted": "Template deleted",
+    "createSuccess": "Template created successfully",
+    "createError": "Error creating template",
+    "updateSuccess": "Template updated successfully",
+    "updateError": "Error updating template",
+    "deleteSuccess": "Template deleted successfully",
+    "deleteError": "Error deleting template",
+    "loadError": "Error loading template",
+    "clusterAdded": "Cluster added",
+    "existingClusterAdded": "Existing cluster with same name was added",
+    "clusterAlreadyAdded": "Cluster already added",
+    "clusterAlreadyAddedDesc": "This cluster is already in your selection",
+    "clusterCreated": "Cluster created",
+    "clusterCreatedDesc": "New cluster was created and added to your selection",
+    "clusterCreateError": "Error creating cluster"
+  },
+  "success": {
+    "created": "Template Created",
+    "templateCreated": "Template was created successfully",
+    "updated": "Template Updated",
+    "templateUpdated": "Template was updated successfully",
+    "deleted": "Template Deleted",
+    "templateDeleted": "Template was deleted successfully"
+  },
+  "errors": {
+    "error": "Error",
+    "fetchFailed": "Failed to load template",
+    "createFailed": "Failed to create template",
+    "updateFailed": "Failed to update template",
+    "deleteFailed": "Failed to delete template"
+  },
+  "defaults": {
+    "untitledTemplate": "Untitled Template"
+  },
+  "actions": {
+    "view": "View Template",
+    "edit": "Edit",
+    "delete": "Delete"
+  },
+  "confirm": {
+    "delete": {
+      "title": "Delete Template",
+      "message": "Are you sure you want to delete this template?",
+      "cancel": "Cancel",
+      "confirm": "Delete"
+    }
+  }
+} 

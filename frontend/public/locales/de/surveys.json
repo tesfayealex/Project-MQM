@@ -254,6 +254,25 @@
       "generate": "Generieren",
       "remove": "Entfernen",
       "saving": "Speichern..."
-    }
+    },
+    "templateSelect": "Vorlage",
+    "selectTemplate": "Vorlage auswählen",
+    "applyTemplate": "Vorlage anwenden",
+    "applyTemplateConfirmTitle": "Vorlage anwenden",
+    "applyTemplateConfirm": "Dies ersetzt alle vorhandenen Werte durch die Vorlagendaten. Sind Sie sicher, dass Sie fortfahren möchten?",
+    "save": "Umfrage speichern",
+    "saving": "Speichern..."
+  },
+  "success": {
+    "created": "Umfrage erstellt",
+    "surveyCreated": "Ihre Umfrage wurde erfolgreich erstellt.",
+    "updated": "Umfrage aktualisiert",
+    "surveyUpdated": "Ihre Umfrage wurde erfolgreich aktualisiert.",
+    "deleted": "Umfrage gelöscht",
+    "surveyDeleted": "Ihre Umfrage wurde erfolgreich gelöscht.",
+    "tokenCreated": "Token erstellt",
+    "tokenDeleted": "Token gelöscht",
+    "templateApplied": "Vorlage angewendet",
+    "templateAppliedDesc": "Die Vorlage wurde auf Ihre Umfrage angewendet."
   }
 } 

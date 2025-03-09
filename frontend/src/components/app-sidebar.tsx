@@ -48,6 +48,12 @@ const items = [
     icon: ClipboardList,
     roles: ["Admin", "Organizer", "Moderator"],
   },
+  {
+    titleKey: "sidebar.templates",
+    url: "/dashboard/templates",
+    icon: ClipboardList,
+    roles: ["Admin", "Organizer", "Moderator"],
+  },
   // {
   //   titleKey: "sidebar.analytics",
   //   url: "/dashboard/analytics",

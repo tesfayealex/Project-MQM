@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Survey, Question, Response, Answer, WordCluster, CustomWordCluster, ResponseWord, SurveyAnalysisSummary, SurveyToken
+from .models import Survey, Question, Response, Answer, WordCluster, CustomWordCluster, ResponseWord, SurveyAnalysisSummary, SurveyToken, Template, TemplateQuestion
 
 
 class QuestionInline(admin.TabularInline):
@@ -94,4 +94,48 @@ class SurveyTokenAdmin(admin.ModelAdmin):
     list_filter = ['created_at']
     search_fields = ['token', 'description', 'survey__title']
     readonly_fields = ['created_at']
+
+
+class TemplateQuestionInline(admin.TabularInline):
+    model = TemplateQuestion
+    extra = 1
+    fields = ['questions', 'placeholders', 'type', 'order', 'language', 'is_required']
+
+
+@admin.register(Template)
+class TemplateAdmin(admin.ModelAdmin):
+    """
+    Admin configuration for the Template model.
+    """
+    list_display = ('title', 'created_by', 'created_at', 'is_active')
+    list_filter = ('is_active', 'created_at', 'format', 'type')
+    search_fields = ('title', 'description')
+    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ('Basic Info', {
+            'fields': ('title', 'description', 'is_active')
+        }),
+        ('Multilingual Content', {
+            'fields': ('headlines', 'survey_texts'),
+            'classes': ('collapse',),
+        }),
+        ('Project Details', {
+            'fields': ('languages', 'format', 'type', 'analysis_cluster'),
+        }),
+        ('End Survey Information', {
+            'fields': (
+                'start_survey_titles', 'start_survey_texts',
+                'end_survey_titles', 'end_survey_texts',
+                'expired_survey_titles', 'expired_survey_texts'
+            ),
+            'classes': ('collapse',),
+        }),
+        ('Metadata', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+    
+    filter_horizontal = ('clusters',)
+    inlines = [TemplateQuestionInline]
 

@@ -33,6 +33,9 @@ export default function SurveyFormClient() {
         languages: data.languages && data.languages.length ? data.languages : ['en'],
         is_active: data.is_active !== undefined ? data.is_active : true,
         
+        // Include template ID if selected
+        template: data.template || null,
+        
         // If questions are provided, ensure they have required fields
         questions: data.questions?.map((q: any, index: number) => ({
           ...q,

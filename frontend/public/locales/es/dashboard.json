@@ -7,7 +7,70 @@
     "title": "Encuestas",
     "active": "Encuestas Activas",
     "completed": "Encuestas Completadas",
-    "create": "Crear Encuesta"
+    "create": "Crear Encuesta",
+    "back": "Volver a Encuestas",
+    "tabs": {
+      "info": "Información",
+      "questions": "Preguntas",
+      "responses": "Respuestas",
+      "statistics": "Estadísticas"
+    }
+  },
+  "templates": {
+    "title": "Plantillas",
+    "active": "Plantillas Activas",
+    "create": "Crear Plantilla",
+    "back": "Volver a Plantillas",
+    "edit": "Editar Plantilla",
+    "tabs": {
+      "info": "Información",
+      "clusters": "Grupos de Palabras"
+    },
+    "details": {
+      "basicInfo": "Información Básica",
+      "basicInfoDesc": "Detalles generales de la plantilla",
+      "attributes": "Atributos de la Plantilla",
+      "attributesDesc": "Propiedades adicionales de la plantilla"
+    },
+    "fields": {
+      "title": "Título",
+      "description": "Descripción",
+      "format": "Formato",
+      "type": "Tipo",
+      "languages": "Idiomas",
+      "created": "Creado",
+      "analysisCluster": "Grupo de Análisis",
+      "clustersCount": "Grupos de Palabras"
+    },
+    "clusters": {
+      "title": "Grupos de Palabras",
+      "description": "Grupos de palabras predefinidos asociados con esta plantilla",
+      "name": "Nombre",
+      "description": "Descripción",
+      "keywords": "Palabras clave",
+      "addNew": "Añadir nuevo grupo de palabras",
+      "remove": "Eliminar"
+    }
+  },
+  "clusters": {
+    "title": "Grupos de Palabras",
+    "active": "Grupos Activos",
+    "create": "Crear Grupo de Palabras"
+  },
+  "settings": {
+    "title": "Configuración",
+    "profile": "Perfil",
+    "account": "Cuenta",
+    "security": "Seguridad",
+    "notifications": "Notificaciones",
+    "appearance": "Apariencia"
+  },
+  "actions": {
+    "view": "Ver",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "save": "Guardar",
+    "cancel": "Cancelar"
   },
   "analytics": {
     "title": "Análisis",

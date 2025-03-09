@@ -1,13 +1,76 @@
 {
-  "welcome": "Willkommen zu Ihrem Dashboard",
+  "welcome": "Willkommen in Ihrem Dashboard",
   "overview": "Übersicht",
-  "recent": "Letzte Aktivitäten",
+  "recent": "Neueste Aktivitäten",
   "stats": "Statistiken",
   "surveys": {
     "title": "Umfragen",
     "active": "Aktive Umfragen",
     "completed": "Abgeschlossene Umfragen",
-    "create": "Umfrage erstellen"
+    "create": "Umfrage erstellen",
+    "back": "Zurück zu Umfragen",
+    "tabs": {
+      "info": "Informationen",
+      "questions": "Fragen",
+      "responses": "Antworten",
+      "statistics": "Statistiken"
+    }
+  },
+  "templates": {
+    "title": "Vorlagen",
+    "active": "Aktive Vorlagen",
+    "create": "Vorlage erstellen",
+    "back": "Zurück zu Vorlagen",
+    "edit": "Vorlage bearbeiten",
+    "tabs": {
+      "info": "Informationen",
+      "clusters": "Wortgruppen"
+    },
+    "details": {
+      "basicInfo": "Grundlegende Informationen",
+      "basicInfoDesc": "Allgemeine Vorlagendetails",
+      "attributes": "Vorlagenattribute",
+      "attributesDesc": "Zusätzliche Vorlageneigenschaften"
+    },
+    "fields": {
+      "title": "Titel",
+      "description": "Beschreibung",
+      "format": "Format",
+      "type": "Typ",
+      "languages": "Sprachen",
+      "created": "Erstellt",
+      "analysisCluster": "Analyse-Cluster",
+      "clustersCount": "Wortgruppen"
+    },
+    "clusters": {
+      "title": "Wortgruppen",
+      "description": "Vordefinierte Wortgruppen, die mit dieser Vorlage verknüpft sind",
+      "name": "Name",
+      "description": "Beschreibung",
+      "keywords": "Schlüsselwörter",
+      "addNew": "Neue Wortgruppe hinzufügen",
+      "remove": "Entfernen"
+    }
+  },
+  "clusters": {
+    "title": "Wortgruppen",
+    "active": "Aktive Wortgruppen",
+    "create": "Wortgruppe erstellen"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "profile": "Profil",
+    "account": "Konto",
+    "security": "Sicherheit",
+    "notifications": "Benachrichtigungen",
+    "appearance": "Erscheinungsbild"
+  },
+  "actions": {
+    "view": "Ansehen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen",
+    "save": "Speichern",
+    "cancel": "Abbrechen"
   },
   "analytics": {
     "title": "Analysen",

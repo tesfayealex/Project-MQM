@@ -1,0 +1,175 @@
+{
+  "list": {
+    "title": "Vorlagen",
+    "create": "Vorlage erstellen",
+    "description": "Vorlagen helfen Ihnen, schnell neue Umfragen mit vordefinierten Strukturen zu erstellen.",
+    "loading": "Vorlagen werden geladen...",
+    "no_templates": "Keine Vorlagen gefunden.",
+    "languages": "Sprachen",
+    "type": "Typ",
+    "created": "Erstellt",
+    "status": "Status",
+    "actions": "Aktionen"
+  },
+  "detail": {
+    "title": "Vorlagendetails",
+    "back": "Zurück zu Vorlagen",
+    "edit": "Vorlage bearbeiten",
+    "delete": "Vorlage löschen",
+    "created_by": "Erstellt von",
+    "created_on": "Erstellt am",
+    "last_updated": "Zuletzt aktualisiert",
+    "languages": "Sprachen",
+    "type": "Typ",
+    "format": "Format",
+    "status": "Status",
+    "clusters": "Wort-Cluster",
+    "no_clusters": "Keine Wort-Cluster zugewiesen",
+    "tabs": {
+      "info": "Informationen",
+      "clusters": "Wort-Cluster",
+      "questions": "Fragen"
+    },
+    "basicInfo": "Grundlegende Informationen",
+    "title": "Titel",
+    "description": "Beschreibung",
+    "status": "Status",
+    "createdAt": "Erstellt am",
+    "updatedAt": "Aktualisiert am",
+    "analysisCluster": "Analyse-Cluster",
+    "clusters": "Zugehörige Wort-Cluster",
+    "noClusters": "Keine Wort-Cluster mit dieser Vorlage verknüpft",
+    "questions": "Fragen",
+    "noQuestions": "Keine Fragen für diese Vorlage definiert",
+    "question": "Frage",
+    "questionType": "Typ",
+    "required": "Erforderlich"
+  },
+  "form": {
+    "tabs": {
+      "basicInfo": "Grundlegende Informationen",
+      "questions": "Fragen",
+      "clusters": "Wort-Cluster"
+    },
+    "basicInfo": "Grundlegende Informationen",
+    "basicInfoDesc": "Allgemeine Informationen über die Vorlage",
+    "title": "Titel",
+    "description": "Beschreibung",
+    "languages": "Sprachen",
+    "format": "Format",
+    "selectFormat": "Format auswählen",
+    "type": "Typ",
+    "selectType": "Typ auswählen",
+    "analysisCluster": "Analyse-Cluster",
+    "selectCluster": "Cluster auswählen",
+    "isActive": "Aktiv",
+    "multilingualContent": "Mehrsprachiger Inhalt",
+    "multilingualContentDesc": "Inhalte in verschiedenen Sprachen bereitstellen",
+    "headline": "Überschrift",
+    "content": "Inhalt",
+    "startTitle": "Start-Titel",
+    "startText": "Start-Text",
+    "endTitle": "End-Titel",
+    "endText": "End-Text",
+    "expiredTitle": "Abgelaufener Titel",
+    "expiredText": "Abgelaufener Text",
+    "questions": "Fragen",
+    "questionsDesc": "Fügen Sie Fragen zu Ihrer Vorlage hinzu",
+    "questionType": "Fragetyp",
+    "questionType_freeText": "Freitext",
+    "questionType_nps": "NPS (0-10)",
+    "isRequired": "Erforderlich",
+    "questionText": "Fragetext",
+    "questionTextPlaceholder": "Geben Sie Ihre Frage ein",
+    "placeholderText": "Platzhaltertext",
+    "placeholderTextPlaceholder": "Platzhaltertext eingeben",
+    "addQuestion": "Frage hinzufügen",
+    "noQuestions": "Noch keine Fragen hinzugefügt. Klicken Sie oben auf die Schaltfläche, um eine Frage hinzuzufügen.",
+    "wordClusters": "Wort-Cluster",
+    "wordClustersDesc": "Verknüpfen Sie diese Vorlage mit Wort-Clustern für die Analyse",
+    "selectedClusters": "Ausgewählte Cluster",
+    "noClustersSelected": "Noch keine Cluster ausgewählt",
+    "addCluster": "Cluster hinzufügen",
+    "selectClusterToAdd": "Wählen Sie ein Cluster zum Hinzufügen",
+    "createNewCluster": "Neues Cluster erstellen",
+    "newClusterName": "Neuer Cluster-Name",
+    "addNewCluster": "Hinzufügen",
+    "clusterList": "Zugehörige Cluster",
+    "noClusterAssigned": "Dieser Vorlage sind noch keine Cluster zugewiesen",
+    "keywords": "Schlüsselwörter",
+    "save": "Vorlage speichern",
+    "saving": "Wird gespeichert...",
+    "settings": "Einstellungen"
+  },
+  "format": {
+    "online": "Online",
+    "faceToFace": "Persönlich"
+  },
+  "type": {
+    "public": "Öffentlich",
+    "friendsFamily": "Freunde & Familie",
+    "professional": "Professionell",
+    "singleCompany": "Einzelnes Unternehmen",
+    "intracompany": "Innerhalb des Unternehmens"
+  },
+  "analysisCluster": {
+    "standard": "Standard",
+    "corenetEvent": "CoreNet-Event",
+    "eventConference": "Event & Konferenz",
+    "homeOffice": "Home Office"
+  },
+  "status": {
+    "active": "Aktiv",
+    "inactive": "Inaktiv"
+  },
+  "messages": {
+    "confirm_delete": "Sind Sie sicher, dass Sie diese Vorlage löschen möchten?",
+    "error": "Ein Fehler ist aufgetreten",
+    "deleted": "Vorlage gelöscht",
+    "createSuccess": "Vorlage erfolgreich erstellt",
+    "createError": "Fehler beim Erstellen der Vorlage",
+    "updateSuccess": "Vorlage erfolgreich aktualisiert",
+    "updateError": "Fehler beim Aktualisieren der Vorlage",
+    "deleteSuccess": "Vorlage erfolgreich gelöscht",
+    "deleteError": "Fehler beim Löschen der Vorlage",
+    "loadError": "Fehler beim Laden der Vorlage",
+    "clusterAdded": "Cluster hinzugefügt",
+    "existingClusterAdded": "Bestehendes Cluster mit gleichem Namen wurde hinzugefügt",
+    "clusterAlreadyAdded": "Cluster bereits hinzugefügt",
+    "clusterAlreadyAddedDesc": "Dieses Cluster ist bereits in Ihrer Auswahl",
+    "clusterCreated": "Cluster erstellt",
+    "clusterCreatedDesc": "Neues Cluster wurde erstellt und zu Ihrer Auswahl hinzugefügt",
+    "clusterCreateError": "Fehler beim Erstellen des Clusters"
+  },
+  "success": {
+    "created": "Vorlage erstellt",
+    "templateCreated": "Vorlage wurde erfolgreich erstellt",
+    "updated": "Vorlage aktualisiert",
+    "templateUpdated": "Vorlage wurde erfolgreich aktualisiert",
+    "deleted": "Vorlage gelöscht",
+    "templateDeleted": "Vorlage wurde erfolgreich gelöscht"
+  },
+  "errors": {
+    "error": "Fehler",
+    "fetchFailed": "Vorlage konnte nicht geladen werden",
+    "createFailed": "Vorlage konnte nicht erstellt werden",
+    "updateFailed": "Vorlage konnte nicht aktualisiert werden",
+    "deleteFailed": "Vorlage konnte nicht gelöscht werden"
+  },
+  "defaults": {
+    "untitledTemplate": "Unbenannte Vorlage"
+  },
+  "actions": {
+    "view": "Vorlage anzeigen",
+    "edit": "Bearbeiten",
+    "delete": "Löschen"
+  },
+  "confirm": {
+    "delete": {
+      "title": "Vorlage löschen",
+      "message": "Sind Sie sicher, dass Sie diese Vorlage löschen möchten?",
+      "cancel": "Abbrechen",
+      "confirm": "Löschen"
+    }
+  }
+} 

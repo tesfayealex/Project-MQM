@@ -39,6 +39,11 @@ class Survey(models.Model):
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     
+    # Template Relationship - allows creating surveys from templates
+    template = models.ForeignKey('Template', on_delete=models.SET_NULL, null=True, blank=True, 
+                                related_name='derived_surveys',
+                                help_text="Template this survey was created from, if any")
+    
     # Multilingual Content
     headlines = models.JSONField(default=dict, blank=True, help_text="Headline text for each language: {'en': 'English Headline', 'de': 'German Headline'}")
     survey_texts = models.JSONField(default=dict, blank=True, help_text="Survey introduction text for each language")
@@ -47,8 +52,8 @@ class Survey(models.Model):
     city = models.CharField(max_length=100, blank=True, null=True)
     country = models.CharField(max_length=100, blank=True, null=True)
     
-    # Project Token
-    token = models.CharField(max_length=100, unique=True, blank=True, null=True, help_text="Only lowercase letters, no special characters, no spaces")
+    # Project Token (legacy)
+    token = models.CharField(max_length=100, blank=True, null=True, help_text="Only lowercase letters, no special characters, no spaces. Legacy field, use tokens instead.")
     
     # Project Details
     languages = ArrayField(
@@ -189,6 +194,7 @@ class Answer(models.Model):
         
         # Get the language from the response
         language = self.response.language
+        survey = self.response.survey
         
         # Process the text to extract words
         processed_words = process_text(self.text_answer, language)
@@ -382,6 +388,78 @@ class SurveyAnalysisSummary(models.Model):
 
     def __str__(self):
         return f"Analysis Summary for {self.survey.title} ({self.last_updated})"
+
+
+class Template(models.Model):
+    LANGUAGE_CHOICES = Survey.LANGUAGE_CHOICES
+    
+    FORMAT_CHOICES = Survey.FORMAT_CHOICES
+    
+    TYPE_CHOICES = Survey.TYPE_CHOICES
+    
+    ANALYSIS_CLUSTER_CHOICES = Survey.ANALYSIS_CLUSTER_CHOICES
+    
+    # Basic Template Info
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True)
+    
+    # Multilingual Content
+    headlines = models.JSONField(default=dict, blank=True, help_text="Headline text for each language: {'en': 'English Headline', 'de': 'German Headline'}")
+    survey_texts = models.JSONField(default=dict, blank=True, help_text="Survey introduction text for each language")
+    
+    # Project Details
+    languages = ArrayField(
+        models.CharField(max_length=2, choices=LANGUAGE_CHOICES),
+        default=list,
+        help_text="List of languages supported by this template"
+    )
+    format = models.CharField(max_length=20, choices=FORMAT_CHOICES, default='online')
+    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='public')
+    analysis_cluster = models.CharField(max_length=50, choices=ANALYSIS_CLUSTER_CHOICES, default='Standard', blank=True, null=True)
+    
+    # End Survey Information
+    start_survey_titles = models.JSONField(default=dict, blank=True, help_text="Titles to show when survey has not started yet for each language")
+    start_survey_texts = models.JSONField(default=dict, blank=True, help_text="Messages to show when survey has not started yet for each language")
+    end_survey_titles = models.JSONField(default=dict, blank=True, help_text="Titles to show at the end of survey for each language")
+    end_survey_texts = models.JSONField(default=dict, blank=True, help_text="Messages to show at the end of survey for each language")
+    expired_survey_titles = models.JSONField(default=dict, blank=True, help_text="Expired survey titles for each language")
+    expired_survey_texts = models.JSONField(default=dict, blank=True, help_text="Expired survey texts for each language")
+    
+    # Clusters
+    clusters = models.ManyToManyField('CustomWordCluster', related_name='templates', blank=True)
+    
+    # Metadata
+    created_by = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return self.title
+
+
+# Add a model for template questions
+class TemplateQuestion(models.Model):
+    QUESTION_TYPES = Question.QUESTION_TYPES
+    
+    template = models.ForeignKey(Template, related_name='questions', on_delete=models.CASCADE)
+    # Multilingual content for questions
+    questions = models.JSONField(default=dict, help_text="Question text for each language: {'en': 'English question', 'de': 'German question'}")
+    placeholders = models.JSONField(default=dict, blank=True, null=True, help_text="Placeholder text for each language")
+    
+    type = models.CharField(max_length=20, choices=QUESTION_TYPES)
+    order = models.IntegerField()
+    is_required = models.BooleanField(default=True)
+    language = models.CharField(max_length=2, choices=Survey.LANGUAGE_CHOICES, default='en', help_text="Primary language of this question")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['order']
+    
+    def __str__(self):
+        question_text = next(iter(self.questions.values()), "Unnamed Question")
+        return f"{self.template.title} - Q{self.order}: {question_text[:30]}"
 
 
 # Create a signal handler to process text answers

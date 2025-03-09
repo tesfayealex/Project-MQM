@@ -263,6 +263,25 @@
       "generate": "Generate",
       "remove": "Remove",
       "saving": "Saving..."
-    }
+    },
+    "templateSelect": "Template",
+    "selectTemplate": "Select a template",
+    "applyTemplate": "Apply Template",
+    "applyTemplateConfirmTitle": "Apply Template",
+    "applyTemplateConfirm": "This will replace any existing values with the template data. Are you sure you want to continue?",
+    "save": "Save Survey",
+    "saving": "Saving..."
+  },
+  "success": {
+    "created": "Survey Created",
+    "surveyCreated": "Your survey has been created successfully.",
+    "updated": "Survey Updated",
+    "surveyUpdated": "Your survey has been updated successfully.",
+    "deleted": "Survey Deleted",
+    "surveyDeleted": "Your survey has been deleted successfully.",
+    "tokenCreated": "Token Created",
+    "tokenDeleted": "Token Deleted",
+    "templateApplied": "Template Applied",
+    "templateAppliedDesc": "The template has been applied to your survey."
   }
 } 

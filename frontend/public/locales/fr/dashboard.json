@@ -4,10 +4,73 @@
   "recent": "Activité Récente",
   "stats": "Statistiques",
   "surveys": {
-    "title": "Sondages",
-    "active": "Sondages Actifs",
-    "completed": "Sondages Terminés",
-    "create": "Créer un Sondage"
+    "title": "Enquêtes",
+    "active": "Enquêtes Actives",
+    "completed": "Enquêtes Terminées",
+    "create": "Créer une Enquête",
+    "back": "Retour aux Enquêtes",
+    "tabs": {
+      "info": "Information",
+      "questions": "Questions",
+      "responses": "Réponses",
+      "statistics": "Statistiques"
+    }
+  },
+  "templates": {
+    "title": "Modèles",
+    "active": "Modèles Actifs",
+    "create": "Créer un Modèle",
+    "back": "Retour aux Modèles",
+    "edit": "Modifier le Modèle",
+    "tabs": {
+      "info": "Information",
+      "clusters": "Groupes de Mots"
+    },
+    "details": {
+      "basicInfo": "Informations de Base",
+      "basicInfoDesc": "Détails généraux du modèle",
+      "attributes": "Attributs du Modèle",
+      "attributesDesc": "Propriétés supplémentaires du modèle"
+    },
+    "fields": {
+      "title": "Titre",
+      "description": "Description",
+      "format": "Format",
+      "type": "Type",
+      "languages": "Langues",
+      "created": "Créé",
+      "analysisCluster": "Cluster d'Analyse",
+      "clustersCount": "Groupes de Mots"
+    },
+    "clusters": {
+      "title": "Groupes de Mots",
+      "description": "Groupes de mots prédéfinis associés à ce modèle",
+      "name": "Nom",
+      "description": "Description",
+      "keywords": "Mots-clés",
+      "addNew": "Ajouter un nouveau groupe de mots",
+      "remove": "Supprimer"
+    }
+  },
+  "clusters": {
+    "title": "Groupes de Mots",
+    "active": "Groupes Actifs",
+    "create": "Créer un Groupe de Mots"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "profile": "Profil",
+    "account": "Compte",
+    "security": "Sécurité",
+    "notifications": "Notifications",
+    "appearance": "Apparence"
+  },
+  "actions": {
+    "view": "Voir",
+    "edit": "Modifier",
+    "delete": "Supprimer",
+    "save": "Enregistrer",
+    "cancel": "Annuler"
   },
   "analytics": {
     "title": "Analyses",

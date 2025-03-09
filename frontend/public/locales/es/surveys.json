@@ -263,6 +263,25 @@
       "generate": "Generar",
       "remove": "Eliminar",
       "saving": "Guardando..."
-    }
+    },
+    "templateSelect": "Plantilla",
+    "selectTemplate": "Seleccionar plantilla",
+    "applyTemplate": "Aplicar plantilla",
+    "applyTemplateConfirmTitle": "Aplicar plantilla",
+    "applyTemplateConfirm": "Esto reemplazará los valores existentes con los datos de la plantilla. ¿Está seguro de que desea continuar?",
+    "save": "Guardar encuesta",
+    "saving": "Guardando..."
+  },
+  "success": {
+    "created": "Encuesta creada",
+    "surveyCreated": "Su encuesta ha sido creada con éxito.",
+    "updated": "Encuesta actualizada",
+    "surveyUpdated": "Su encuesta ha sido actualizada con éxito.",
+    "deleted": "Encuesta eliminada",
+    "surveyDeleted": "Su encuesta ha sido eliminada con éxito.",
+    "tokenCreated": "Token creado",
+    "tokenDeleted": "Token eliminado",
+    "templateApplied": "Plantilla aplicada",
+    "templateAppliedDesc": "La plantilla ha sido aplicada a su encuesta."
   }
 }

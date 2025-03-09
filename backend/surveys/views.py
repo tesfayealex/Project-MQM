@@ -7,7 +7,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.contrib.auth.models import User, Group
 from collections import Counter
-from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster
+from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster, Template
 from .serializers import (
     SurveySerializer, 
     SurveyDetailSerializer,
@@ -18,7 +18,10 @@ from .serializers import (
     WordClusterSerializer,
     ResponseWordSerializer,
     SurveyAnalysisSummarySerializer,
-    CustomWordClusterSerializer
+    CustomWordClusterSerializer,
+    TemplateSerializer,
+    TemplateDetailSerializer,
+    SurveyWithTemplateSerializer
 )
 from django.http import HttpResponse
 import qrcode
@@ -79,7 +82,9 @@ class SurveyViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsCreatorOrReadOnly]
     
     def get_serializer_class(self):
-        if self.action in ['create', 'update', 'partial_update', 'retrieve', 'public']:
+        if self.action == 'retrieve':
+            return SurveyWithTemplateSerializer
+        elif self.action in ['create', 'update', 'partial_update']:
             return SurveyDetailSerializer
         return SurveySerializer
     
@@ -1885,5 +1890,89 @@ class ProcessSurveyResponsesView(APIView):
                 {"error": f"An error occurred: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class TemplateViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint for managing templates.
+    Templates are used to create surveys with predefined structures and clusters.
+    """
+    queryset = Template.objects.all()
+    permission_classes = [permissions.IsAuthenticated, IsCreatorOrReadOnly]
+    
+    def get_serializer_class(self):
+        if self.action in ['retrieve', 'update', 'partial_update', 'create']:
+            return TemplateDetailSerializer
+        return TemplateSerializer
+    
+    def get_queryset(self):
+        user = self.request.user
+        
+        # Admin sees all templates
+        if user.is_staff or user.is_superuser or user.groups.filter(name='Admin').exists():
+            return Template.objects.all()
+        
+        # Others see only their templates
+        return Template.objects.filter(created_by=user)
+    
+    @action(detail=True, methods=['post'])
+    def add_cluster(self, request, pk=None):
+        template = self.get_object()
+        cluster_id = request.data.get('cluster_id')
+        
+        try:
+            cluster = CustomWordCluster.objects.get(id=cluster_id)
+            
+            # Add the cluster to the template
+            template.clusters.add(cluster)
+            
+            return Response({
+                'status': 'success',
+                'message': f'Cluster "{cluster.name}" added to template.'
+            }, status=status.HTTP_200_OK)
+            
+        except CustomWordCluster.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Cluster does not exist.'
+            }, status=status.HTTP_404_NOT_FOUND)
+    
+    @action(detail=True, methods=['post'])
+    def remove_cluster(self, request, pk=None):
+        template = self.get_object()
+        cluster_id = request.data.get('cluster_id')
+        
+        try:
+            cluster = CustomWordCluster.objects.get(id=cluster_id)
+            
+            # Remove the cluster from the template
+            template.clusters.remove(cluster)
+            
+            return Response({
+                'status': 'success',
+                'message': f'Cluster "{cluster.name}" removed from template.'
+            }, status=status.HTTP_200_OK)
+            
+        except CustomWordCluster.DoesNotExist:
+            return Response({
+                'status': 'error',
+                'message': 'Cluster does not exist.'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    def update(self, request, *args, **kwargs):
+        """Override update method to add debugging"""
+        print("\n\n=== TEMPLATE UPDATE DEBUG ===")
+        print(f"Template ID: {kwargs.get('pk')}")
+        print(f"Request data: {request.data}")
+        if 'clusters' in request.data:
+            print(f"Clusters in request: {request.data['clusters']}")
+            print(f"Clusters type: {type(request.data['clusters'])}")
+            
+        response = super().update(request, *args, **kwargs)
+        
+        # Log the result for debugging
+        template = self.get_object()
+        print(f"After update - Template clusters: {list(template.clusters.values('id', 'name'))}")
+        return response
 
 

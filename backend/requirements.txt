@@ -8,3 +8,5 @@ numpy==2.2.3
 nltk==3.9.1
 scikit-learn==1.6.1 
 openai==1.65.3
+qrcode[pil]==8.0
+spacy==3.8.4

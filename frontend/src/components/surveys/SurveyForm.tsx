@@ -13,6 +13,7 @@ import { DatePicker } from "@/components/ui/date-picker";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Survey, SurveyQuestion } from '@/types/survey';
+import { Template } from '@/types/template';
 import QuestionForm from './QuestionForm';
 import { format } from 'date-fns';
 import { PlusIcon, XMarkIcon } from '@heroicons/react/24/outline';
@@ -20,7 +21,9 @@ import { toast } from "@/components/ui/use-toast";
 import { useTranslation } from 'react-i18next';
 import { getCookie } from 'cookies-next';
 import { useLanguage } from '@/contexts/language-context';
-import { Select } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { getTemplates } from '@/lib/services/template-service';
 
 // Available languages
 const AVAILABLE_LANGUAGES = [
@@ -77,7 +80,8 @@ const surveySchema = z.object({
     })
   ).optional(),
   is_active: z.boolean().default(true),
-  questions: z.array(questionSchema).default([])
+  questions: z.array(questionSchema).default([]),
+  template: z.union([z.number(), z.string()]).optional() // Add template field
 });
 
 type SurveyFormValues = z.infer<typeof surveySchema>;
@@ -92,6 +96,26 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
   const { t, i18n } = useTranslation(['surveys', 'common']);
   const { locale: currentLanguage } = useLanguage();
   
+  // Add state for templates
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+
+  // Fetch templates on component mount
+  useEffect(() => {
+    async function loadTemplates() {
+      try {
+        const templatesData = await getTemplates();
+        setTemplates(templatesData);
+      } catch (error) {
+        console.error('Error loading templates:', error);
+      }
+    }
+    
+    loadTemplates();
+  }, []);
+
   // Helper function to format ISO datetime strings for datetime-local input
   const formatDateForInput = (dateString: string): string => {
     try {
@@ -286,8 +310,20 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
     // Format the data for submission
     const formattedData = {
       ...data,
+      // Remove the token field entirely as we're no longer using it
+      // token: tokens.length > 0 ? tokens[0].token : generateToken(),
       expiry_date: data.expiry_date || undefined,
       start_datetime: data.start_datetime || undefined,
+      // Make sure to add the English title to headlines
+      headlines: {
+        ...data.headlines,
+        en: data.title || ''
+      },
+      // Make sure to add the English description to survey_texts
+      survey_texts: {
+        ...data.survey_texts,
+        en: data.description || ''
+      },
       start_survey_titles: {
         ...data.start_survey_titles,
         [data.languages[0]]: data.start_survey_title || ''
@@ -385,9 +421,125 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
     }
   }, [currentLanguage, methods, selectedLanguages]);
 
+  // Function to handle template selection
+  const handleTemplateSelect = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    const template = templates.find(t => t.id.toString() === templateId) || null;
+    setSelectedTemplate(template);
+  };
+
+  // Function to apply template data to form
+  const applyTemplateData = () => {
+    setIsTemplateDialogOpen(true);
+  };
+
+  // Function to confirm and apply template data
+  const confirmApplyTemplate = () => {
+    if (!selectedTemplate) return;
+    
+    // Update form values with template data
+    methods.setValue('title', selectedTemplate.title);
+    methods.setValue('description', selectedTemplate.description || '');
+    methods.setValue('languages', selectedTemplate.languages);
+    methods.setValue('format', selectedTemplate.format || 'online');
+    methods.setValue('type', selectedTemplate.type || 'public');
+    methods.setValue('analysis_cluster', selectedTemplate.analysis_cluster || 'Standard');
+    
+    // Multilingual content - make sure to include English
+    const headlines = {
+      ...selectedTemplate.headlines || {},
+      en: selectedTemplate.title || ''
+    };
+    
+    const surveyTexts = {
+      ...selectedTemplate.survey_texts || {},
+      en: selectedTemplate.description || ''
+    };
+    
+    methods.setValue('headlines', headlines);
+    methods.setValue('survey_texts', surveyTexts);
+    
+    // Start, end and expired messages
+    methods.setValue('start_survey_titles', selectedTemplate.start_survey_titles || {});
+    methods.setValue('start_survey_texts', selectedTemplate.start_survey_texts || {});
+    methods.setValue('end_survey_titles', selectedTemplate.end_survey_titles || {});
+    methods.setValue('end_survey_texts', selectedTemplate.end_survey_texts || {});
+    methods.setValue('expired_survey_titles', selectedTemplate.expired_survey_titles || {});
+    methods.setValue('expired_survey_texts', selectedTemplate.expired_survey_texts || {});
+    
+    // Update current language fields
+    if (currentLanguage) {
+      methods.setValue('start_survey_title', selectedTemplate.start_survey_titles?.[currentLanguage] || '');
+      methods.setValue('start_survey_text', selectedTemplate.start_survey_texts?.[currentLanguage] || '');
+      methods.setValue('end_survey_title', selectedTemplate.end_survey_titles?.[currentLanguage] || '');
+      methods.setValue('end_survey_text', selectedTemplate.end_survey_texts?.[currentLanguage] || '');
+      methods.setValue('expired_survey_title', selectedTemplate.expired_survey_titles?.[currentLanguage] || '');
+      methods.setValue('expired_survey_text', selectedTemplate.expired_survey_texts?.[currentLanguage] || '');
+    }
+    
+    // Add questions from template
+    if (selectedTemplate.questions && selectedTemplate.questions.length > 0) {
+      const formattedQuestions = selectedTemplate.questions.map((q, index) => ({
+        id: undefined, // New ID for the survey question
+        order: index + 1,
+        type: q.type,
+        questions: { ...q.questions },
+        is_required: q.is_required,
+        placeholders: { ...q.placeholders },
+        language: q.language || 'en'
+      }));
+      
+      methods.setValue('questions', formattedQuestions);
+    }
+    
+    // Set template relationship
+    methods.setValue('template', selectedTemplate.id);
+    
+    setIsTemplateDialogOpen(false);
+    
+    toast({
+      title: t('success.templateApplied'),
+      description: t('success.templateAppliedDesc'),
+    });
+  };
+
   return (
     <FormProvider {...methods}>
       <form onSubmit={methods.handleSubmit(handleSubmit)} className="space-y-8">
+        {/* Template Selection */}
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <div className="flex items-end gap-4">
+              <div className="flex-1 space-y-2">
+                <Label htmlFor="templateSelect">{t('form.templateSelect')}</Label>
+                <Select 
+                  value={selectedTemplateId} 
+                  onValueChange={handleTemplateSelect}
+                >
+                  <SelectTrigger id="templateSelect">
+                    <SelectValue placeholder={t('form.selectTemplate')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map(template => (
+                      <SelectItem key={template.id} value={template.id.toString()}>
+                        {template.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={applyTemplateData}
+                disabled={!selectedTemplateId}
+              >
+                {t('form.applyTemplate')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         <Tabs defaultValue="general">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="general">{t('form.tabs.general')}</TabsTrigger>
@@ -819,6 +971,26 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Template Apply Dialog */}
+        <Dialog open={isTemplateDialogOpen} onOpenChange={setIsTemplateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('form.applyTemplateConfirmTitle')}</DialogTitle>
+              <DialogDescription>
+                {t('form.applyTemplateConfirm')}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>
+                {t('actions.cancel')}
+              </Button>
+              <Button onClick={confirmApplyTemplate}>
+                {t('actions.confirm')}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <div className="space-y-4">
           {/* Show any form-level errors */}

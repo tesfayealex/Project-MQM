@@ -7,7 +7,50 @@
     "title": "Surveys",
     "active": "Active Surveys",
     "completed": "Completed Surveys",
-    "create": "Create Survey"
+    "create": "Create Survey",
+    "back": "Back to Surveys",
+    "tabs": {
+      "info": "Information",
+      "questions": "Questions",
+      "responses": "Responses",
+      "statistics": "Statistics"
+    }
+  },
+  "templates": {
+    "title": "Templates",
+    "active": "Active Templates",
+    "create": "Create Template",
+    "back": "Back to Templates",
+    "edit": "Edit Template",
+    "tabs": {
+      "info": "Information",
+      "clusters": "Word Clusters"
+    },
+    "details": {
+      "basicInfo": "Basic Information",
+      "basicInfoDesc": "General template details",
+      "attributes": "Template Attributes",
+      "attributesDesc": "Additional template properties"
+    },
+    "fields": {
+      "title": "Title",
+      "description": "Description",
+      "format": "Format",
+      "type": "Type",
+      "languages": "Languages",
+      "created": "Created",
+      "analysisCluster": "Analysis Cluster",
+      "clustersCount": "Word Clusters"
+    },
+    "clusters": {
+      "title": "Word Clusters",
+      "description": "Predefined word clusters associated with this template",
+      "name": "Name",
+      "description": "Description",
+      "keywords": "Keywords",
+      "empty": "No word clusters assigned to this template"
+    },
+    "notSpecified": "Not specified"
   },
   "analytics": {
     "title": "Analytics",

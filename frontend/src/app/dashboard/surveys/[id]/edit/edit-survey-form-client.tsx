@@ -6,6 +6,7 @@ import { toast } from '@/components/ui/use-toast';
 import SurveyForm from '@/components/surveys/SurveyForm';
 import { updateSurvey } from '@/lib/services/survey-service';
 import { Survey } from '@/types/survey';
+import { useTranslation } from 'react-i18next';
 
 interface EditSurveyFormClientProps {
   initialData: Survey;
@@ -14,15 +15,22 @@ interface EditSurveyFormClientProps {
 export default function EditSurveyFormClient({ initialData }: EditSurveyFormClientProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
+  const { t } = useTranslation('surveys');
 
   const handleSubmit = async (data: any) => {
     setIsLoading(true);
     try {
-      const response = await updateSurvey(initialData.id, data);
+      // Ensure the template field is included
+      const surveyData = {
+        ...data,
+        template: data.template || null
+      };
+      
+      const response = await updateSurvey(initialData.id.toString(), surveyData);
       
       toast({
-        title: 'Survey Updated',
-        description: 'Your survey has been updated successfully.',
+        title: t('success.updated'),
+        description: t('success.surveyUpdated'),
       });
       
       router.push(`/dashboard/surveys`);
@@ -32,8 +40,8 @@ export default function EditSurveyFormClient({ initialData }: EditSurveyFormClie
       
       toast({
         variant: 'destructive',
-        title: 'Error',
-        description: error.message || 'Failed to update survey. Please try again.',
+        title: t('errors.error'),
+        description: error.message || t('errors.updateFailed'),
       });
     } finally {
       setIsLoading(false);
