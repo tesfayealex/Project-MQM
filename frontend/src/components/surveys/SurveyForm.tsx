@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, FormProvider } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +24,9 @@ import { useLanguage } from '@/contexts/language-context';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getTemplates } from '@/lib/services/template-service';
+import { checkSurveyHasResponses, debugSurveyQuestions } from '@/lib/services/survey-service';
+import { useRouter } from 'next/navigation';
+import { useToast } from "@/components/ui/use-toast";
 
 // Available languages
 const AVAILABLE_LANGUAGES = [
@@ -81,7 +84,7 @@ const surveySchema = z.object({
   ).optional(),
   is_active: z.boolean().default(true),
   questions: z.array(questionSchema).default([]),
-  template: z.union([z.number(), z.string()]).optional() // Add template field
+  template: z.union([z.number(), z.string(), z.null()]).optional() // Allow null values
 });
 
 type SurveyFormValues = z.infer<typeof surveySchema>;
@@ -95,11 +98,17 @@ interface SurveyFormProps {
 export default function SurveyForm({ initialData, onSubmit, isLoading = false }: SurveyFormProps) {
   const { t, i18n } = useTranslation(['surveys', 'common']);
   const { locale: currentLanguage } = useLanguage();
-  
-  // Add state for templates
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const router = useRouter();
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<string>("general");
   const [isTemplateDialogOpen, setIsTemplateDialogOpen] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [hasResponses, setHasResponses] = useState(false);
+  const [questionsWithAnswers, setQuestionsWithAnswers] = useState<{ id: number; questions: Record<string, string>; answer_count: number }[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
 
   // Fetch templates on component mount
@@ -153,15 +162,20 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
       headlines: initialData?.headlines || {},
       survey_texts: initialData?.survey_texts || {},
       is_active: initialData?.is_active ?? true,
-      questions: initialData?.questions?.map((q, index) => ({
-        ...q,
-        id: q.id,
-        order: index + 1,
-        questions: { ...q.questions },
-        is_required: q.is_required ?? true,
-        placeholders: { ...q.placeholders },
-        type: q.type || 'nps'
-      })) || [],
+      questions: initialData?.questions?.map((q, index) => {
+        // Ensure IDs are properly preserved
+        console.log(`Mapping question ${index} with ID:`, q.id, typeof q.id);
+        return {
+          ...q,
+          // Explicitly preserve the ID as is (don't convert to string)
+          id: q.id,
+          order: index + 1,
+          questions: { ...q.questions },
+          is_required: q.is_required ?? true,
+          placeholders: { ...q.placeholders },
+          type: q.type || 'nps'
+        };
+      }) || [],
       start_survey_title: initialData?.start_survey_titles?.[currentLanguage] || '',
       start_survey_text: initialData?.start_survey_texts?.[currentLanguage] || '',
       start_survey_titles: initialData?.start_survey_titles || {},
@@ -258,6 +272,39 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
     setTokens(newTokens);
   };
 
+  // Check if questions with answers have been deleted without a warning
+  const checkDeletedQuestionsWithAnswers = (currentQuestions: any[]): boolean => {
+    // If we don't have initial data or no previous questions, nothing to check
+    if (!initialData?.questions || !initialData.questions.length) {
+      return false;
+    }
+    
+    // Get a map of all question IDs that have answers
+    const questionsWithAnswersMap = new Map<number, boolean>();
+    questionsWithAnswers.forEach(q => {
+      questionsWithAnswersMap.set(q.id, true);
+    });
+    
+    // Get a map of all current question IDs
+    const currentQuestionIds = new Set(
+      currentQuestions
+        .filter(q => q.id && typeof q.id === 'number')
+        .map(q => Number(q.id))
+    );
+    
+    // Check if any question with answers is missing
+    let missingQuestionWithAnswers = false;
+    
+    initialData.questions.forEach(q => {
+      if (q.id && questionsWithAnswersMap.has(Number(q.id)) && !currentQuestionIds.has(Number(q.id))) {
+        console.warn(`Question with ID ${q.id} has answers but was removed without confirmation`);
+        missingQuestionWithAnswers = true;
+      }
+    });
+    
+    return missingQuestionWithAnswers;
+  };
+
   // Handle form submission
   const validateForm = () => {
     const errors = formState.errors;
@@ -277,7 +324,69 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
   };
 
   const handleSubmit = async (data: SurveyFormValues) => {
-    console.log('Form submission started');
+    // Enhanced debugging for question IDs
+    console.log('Survey form submission data (DETAILED):', {
+      formData: data,
+      questionIDs: data.questions?.map(q => ({
+        id: q.id,
+        idType: typeof q.id,
+        idValue: q.id,
+        order: q.order,
+        type: q.type
+      })) || [],
+      originalQuestions: initialData?.questions?.map(q => ({
+        id: q.id,
+        idType: typeof q.id,
+        idValue: q.id
+      })) || []
+    });
+    
+    // Check if questions have IDs before submitting
+    const hasAnyQuestionIds = data.questions?.some(q => q.id !== undefined && q.id !== null);
+    console.log('Has any question IDs:', hasAnyQuestionIds);
+    
+    // If we're editing and no questions have IDs, we should fix it
+    if (initialData?.id && initialData?.questions && initialData.questions.length > 0 && !hasAnyQuestionIds) {
+      console.warn('No question IDs detected in form data but we are editing existing questions. This will cause all questions to be recreated.');
+      
+      // Try to correct the data by matching questions by position and adding IDs
+      if (initialData.questions && data.questions && data.questions.length >= initialData.questions.length) {
+        const updatedQuestions = data.questions.map((q, index) => {
+          if (initialData.questions && index < initialData.questions.length) {
+            // Copy the question data but add the original ID
+            return {
+              ...q,
+              id: initialData.questions[index].id
+            };
+          }
+          return q;
+        });
+        
+        console.log('Fixed questions with IDs:', updatedQuestions.map(q => ({
+          id: q.id,
+          idType: typeof q.id
+        })));
+        
+        // Update the data with fixed questions
+        data.questions = updatedQuestions;
+      }
+    }
+    
+    // Check if any questions with answers have been deleted without confirmation
+    if (data.questions && checkDeletedQuestionsWithAnswers(data.questions)) {
+      // Show a confirmation dialog
+      const confirmed = window.confirm(
+        t('questions.deleteWarningDescription') || 
+        "Warning: You are about to delete questions that have answers. This will preserve the answer data but break the connection to the question. Are you sure you want to continue?"
+      );
+      
+      if (!confirmed) {
+        console.log('Submission cancelled due to unconfirmed deletion of questions with answers');
+        return;
+      }
+      
+      console.log('User confirmed deletion of questions with answers, proceeding with submission');
+    }
     
     // Check if we have at least one token
     if (tokens.length === 0) {
@@ -305,55 +414,82 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
       return;
     }
     
-    console.log('Raw form data:', data);
-    
-    // Format the data for submission
-    const formattedData = {
-      ...data,
-      // Remove the token field entirely as we're no longer using it
-      // token: tokens.length > 0 ? tokens[0].token : generateToken(),
-      expiry_date: data.expiry_date || undefined,
-      start_datetime: data.start_datetime || undefined,
-      // Make sure to add the English title to headlines
-      headlines: {
-        ...data.headlines,
-        en: data.title || ''
-      },
-      // Make sure to add the English description to survey_texts
-      survey_texts: {
-        ...data.survey_texts,
-        en: data.description || ''
-      },
-      start_survey_titles: {
-        ...data.start_survey_titles,
-        [data.languages[0]]: data.start_survey_title || ''
-      },
-      start_survey_texts: {
-        ...data.start_survey_texts,
-        [data.languages[0]]: data.start_survey_text || ''
-      },
-      end_survey_titles: {
-        ...data.end_survey_titles,
-        [data.languages[0]]: data.end_survey_title || ''
-      },
-      end_survey_texts: {
-        ...data.end_survey_texts,
-        [data.languages[0]]: data.end_survey_text || ''
-      },
-      expired_survey_titles: {
-        ...data.expired_survey_titles,
-        [data.languages[0]]: data.expired_survey_title || ''
-      },
-      expired_survey_texts: {
-        ...data.expired_survey_texts,
-        [data.languages[0]]: data.expired_survey_text || ''
-      },
-      tokens: tokens
-    };
-    
-    console.log('Formatted data for submission:', formattedData);
-    
-    await onSubmit(formattedData);
+    try {
+      setIsSubmitting(true);
+      
+      // Normalize tokens data
+      data.tokens = data.tokens || [];
+      
+      // Format the data for submission
+      const submissionData = {
+        ...data,
+        // Make sure to explicitly include questions
+        questions: data.questions || [],
+        // Normalize the template field value
+        template: data.template === "" || data.template === undefined ? null : 
+                 (typeof data.template === 'string' && !isNaN(Number(data.template)) ? 
+                 Number(data.template) : data.template),
+        // Remove the token field entirely as we're no longer using it
+        // token: tokens.length > 0 ? tokens[0].token : generateToken(),
+        expiry_date: data.expiry_date || undefined,
+        start_datetime: data.start_datetime || undefined,
+        // Make sure to add the English title to headlines
+        headlines: {
+          ...data.headlines,
+          en: data.title || ''
+        },
+        // Make sure to add the English description to survey_texts
+        survey_texts: {
+          ...data.survey_texts,
+          en: data.description || ''
+        },
+        start_survey_titles: {
+          ...data.start_survey_titles,
+          [data.languages[0]]: data.start_survey_title || ''
+        },
+        start_survey_texts: {
+          ...data.start_survey_texts,
+          [data.languages[0]]: data.start_survey_text || ''
+        },
+        end_survey_titles: {
+          ...data.end_survey_titles,
+          [data.languages[0]]: data.end_survey_title || ''
+        },
+        end_survey_texts: {
+          ...data.end_survey_texts,
+          [data.languages[0]]: data.end_survey_text || ''
+        },
+        expired_survey_titles: {
+          ...data.expired_survey_titles,
+          [data.languages[0]]: data.expired_survey_title || ''
+        },
+        expired_survey_texts: {
+          ...data.expired_survey_texts,
+          [data.languages[0]]: data.expired_survey_text || ''
+        },
+        tokens: tokens
+      };
+      
+      console.log('Formatted data for submission:', submissionData);
+      console.log('Questions being sent to backend:', JSON.stringify(submissionData.questions, null, 2));
+      
+      // Submit the form
+      const result = await onSubmit(submissionData);
+      
+      // Log the result
+      console.log('Survey form submission result:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('Error submitting survey form:', error);
+      toast({
+        title: t('form.submitError'),
+        description: error instanceof Error ? error.message : String(error),
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Handle language toggle with proper state updates
@@ -501,6 +637,92 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
       title: t('success.templateApplied'),
       description: t('success.templateAppliedDesc'),
     });
+  };
+
+  // Check if the survey has responses when editing
+  useEffect(() => {
+    if (initialData?.id) {
+      checkForResponses(initialData.id.toString());
+    }
+  }, [initialData?.id]);
+  
+  // Function to check if a survey has responses
+  const checkForResponses = async (surveyId: string) => {
+    try {
+      const responseInfo = await checkSurveyHasResponses(surveyId);
+      setHasResponses(responseInfo.has_responses);
+      setQuestionsWithAnswers(responseInfo.questions_with_answers || []);
+      
+      // Enhanced debugging
+      console.log('Survey responses info:', {
+        surveyId,
+        hasResponses: responseInfo.has_responses,
+        responseCount: responseInfo.response_count,
+        questionsWithAnswers: responseInfo.questions_with_answers,
+        canDeleteSafely: responseInfo.can_delete_safely
+      });
+
+      // If we have the form already loaded with questions, let's mark questions that have answers
+      if (responseInfo.questions_with_answers && responseInfo.questions_with_answers.length > 0) {
+        const currentQuestions = methods.getValues('questions') || [];
+        
+        if (currentQuestions.length > 0) {
+          // Create a map of database ID -> answer count for quick lookup
+          const questionAnswersMap = new Map();
+          responseInfo.questions_with_answers.forEach(q => {
+            questionAnswersMap.set(q.id, q.answer_count);
+          });
+          
+          // Update each question with a hasAnswers flag for direct checking
+          const updatedQuestions = currentQuestions.map(q => {
+            // Check if this question has a database ID and has answers
+            if (q.id && typeof q.id === 'number' && questionAnswersMap.has(q.id)) {
+              return {
+                ...q,
+                hasAnswers: true,
+                answerCount: questionAnswersMap.get(q.id)
+              };
+            }
+            return q;
+          });
+          
+          // Update the form with this enhanced data
+          methods.setValue('questions', updatedQuestions);
+          console.log('Enhanced question data with answer info:', updatedQuestions);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check for survey responses:', error);
+      // Default to safe values
+      setHasResponses(false);
+      setQuestionsWithAnswers([]);
+    }
+  };
+
+  // Debug function to examine questions in a survey
+  const debugQuestions = async (surveyId?: string) => {
+    if (!surveyId) {
+      console.error("Cannot debug questions - no survey ID provided");
+      return;
+    }
+    
+    try {
+      console.log(`Debugging questions for survey ${surveyId}...`);
+      const result = await debugSurveyQuestions(surveyId);
+      console.log("DEBUG QUESTIONS RESULT:", result);
+      
+      if (result.questions?.length > 0) {
+        console.table(result.questions.map((q: any) => ({
+          id: q.id,
+          order: q.order,
+          type: q.type,
+          text: q.first_question_text?.substring(0, 30) + (q.first_question_text?.length > 30 ? '...' : ''),
+          answers: q.answer_count
+        })));
+      }
+    } catch (error) {
+      console.error("Error debugging questions:", error);
+    }
   };
 
   return (
@@ -695,12 +917,19 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
 
           {/* Questions Tab */}
           <TabsContent value="questions">
-            <QuestionForm languages={selectedLanguages} />
-            {methods.formState.errors.questions && (
-              <p className="text-sm text-red-500 mt-1">
-                {methods.formState.errors.questions.message}
-              </p>
-            )}
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('questions.title')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <QuestionForm 
+                  languages={selectedLanguages} 
+                  questionsWithAnswers={questionsWithAnswers}
+                  hasResponses={hasResponses}
+                  showDeleteWarning={true}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* End Messages Tab */}
@@ -986,7 +1215,7 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
                 {t('actions.cancel')}
               </Button>
               <Button onClick={confirmApplyTemplate}>
-                {t('actions.confirm')}
+                {t('form.applyTemplate')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1013,26 +1242,79 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
                     analysis_cluster: 'form.fields.analysisCluster',
                     city: 'form.fields.city',
                     country: 'form.fields.country',
+                    template: 'form.fields.template',
+                    start_survey_titles: 'form.fields.start_survey_titles',
+                    start_survey_texts: 'form.fields.start_survey_texts',
+                    end_survey_titles: 'form.fields.end_survey_titles',
+                    end_survey_texts: 'form.fields.end_survey_texts',
+                    expired_survey_titles: 'form.fields.expired_survey_titles',
+                    expired_survey_texts: 'form.fields.expired_survey_texts'
                   };
 
-                  const fieldName = t(fieldMap[key] || key);
+                  // Get a human-readable field name
+                  const getFieldName = (key: string): string => {
+                    // Check if it's a nested field (contains dots)
+                    if (key.includes('.')) {
+                      const parts = key.split('.');
+                      // Handle language-specific fields like start_survey_titles.de
+                      if (parts.length === 2) {
+                        const fieldKey = parts[0];
+                        const lang = parts[1];
+                        const field = t(fieldMap[fieldKey] || fieldKey);
+                        const langName = AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name || lang.toUpperCase();
+                        return `${field} (${langName})`;
+                      }
+                      // Handle nested fields in arrays like tokens[0].token
+                      if (parts[0] === 'tokens' && parts.length === 3) {
+                        const index = parseInt(parts[1]) + 1;
+                        const field = parts[2] === 'token' ? 'Token Value' : 
+                                     parts[2] === 'description' ? 'Description' : parts[2];
+                        return `Token ${index} ${field}`;
+                      }
+                    }
+                    
+                    // Regular field
+                    return t(fieldMap[key] || key);
+                  };
+                  
+                  // Generate appropriate error message
                   let errorMessage = '';
                   
                   if (error?.message) {
-                    errorMessage = `${fieldName}: ${error.message.toString()}`;
+                    // Use error message from validation if available
+                    errorMessage = `${getFieldName(key)}: ${error.message.toString()}`;
                   } else if (key === 'tokens') {
+                    // Handle tokens array validation
                     errorMessage = t('form.errors.tokensValidation');
-                  } else {
-                    errorMessage = t('form.errors.fieldRequired', { field: fieldName });
-                  }
-                  
-                  if (key.includes('.')) {
+                  } else if (key === 'template') {
+                    // Handle template field specifically
+                    errorMessage = t('form.errors.templateRequired');
+                  } else if (key.includes('.')) {
+                    // Handle nested fields
                     const parts = key.split('.');
-                    if (parts[0] === 'tokens' && parts.length === 3) {
+                    if (parts.length === 2) {
+                      // Field with language code like start_survey_titles.de
+                      const fieldKey = parts[0];
+                      const lang = parts[1];
+                      const field = t(fieldMap[fieldKey] || fieldKey);
+                      const langName = AVAILABLE_LANGUAGES.find(l => l.code === lang)?.name || lang.toUpperCase();
+                      
+                      errorMessage = t('form.errors.requiredLanguageField', { 
+                        field, 
+                        language: langName 
+                      });
+                    } else if (parts[0] === 'tokens' && parts.length === 3) {
+                      // Handle token array items
                       const index = parseInt(parts[1]) + 1;
                       const field = parts[2] === 'token' ? 'value' : parts[2];
                       errorMessage = t('form.errors.tokenFieldRequired', { index, field });
+                    } else {
+                      // Default for other nested fields
+                      errorMessage = t('form.errors.fieldRequired', { field: getFieldName(key) });
                     }
+                  } else {
+                    // Default for simple fields
+                    errorMessage = t('form.errors.fieldRequired', { field: getFieldName(key) });
                   }
                   
                   return <li key={key}>{errorMessage}</li>;
@@ -1058,6 +1340,25 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
             </Button>
           </div>
         </div>
+
+        {/* Debug button - only in development */}
+        {process.env.NODE_ENV === 'development' && initialData?.id && (
+          <Card className="mb-4">
+            <CardHeader>
+              <div className="flex justify-between items-center">
+                <CardTitle>{t('survey.title')}</CardTitle>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => debugQuestions(initialData.id?.toString())}
+                >
+                  Debug Questions
+                </Button>
+              </div>
+            </CardHeader>
+          </Card>
+        )}
       </form>
     </FormProvider>
   );

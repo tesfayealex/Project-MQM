@@ -50,6 +50,35 @@ export default function PublicSurvey({ params }: PageProps) {
             question: q.id || ''
           })));
         }
+
+        // Check if survey has not started yet
+        const hasStartDatePassed = data.start_datetime ? new Date(data.start_datetime) <= new Date() : true;
+        
+        if (!hasStartDatePassed) {
+          // Store survey data for start message
+          sessionStorage.setItem('surveyNotStarted', 'true');
+          sessionStorage.setItem('surveyTitle', data.title);
+          sessionStorage.setItem('surveyLanguage', currentLanguage);
+          
+          // Store start messages
+          if (data.start_survey_titles && typeof data.start_survey_titles === 'object') {
+            const startTitle = data.start_survey_titles[currentLanguage] || data.start_survey_titles['en'] || 'Survey Not Started Yet';
+            sessionStorage.setItem('startSurveyTitle', startTitle);
+          } else {
+            sessionStorage.setItem('startSurveyTitle', 'Survey Not Started Yet');
+          }
+          
+          if (data.start_survey_texts && typeof data.start_survey_texts === 'object') {
+            const startMessage = data.start_survey_texts[currentLanguage] || data.start_survey_texts['en'] || 'This survey is not accepting responses yet. Please check back later.';
+            sessionStorage.setItem('startSurveyMessage', startMessage);
+          } else {
+            sessionStorage.setItem('startSurveyMessage', 'This survey is not accepting responses yet. Please check back later.');
+          }
+          
+          // Navigate to thanks page (which will handle displaying the start message)
+          router.push('/survey/thanks');
+          return;
+        }
         
         // Check if survey has expired or is inactive
         const isExpiredByDate = data.expiry_date ? new Date(data.expiry_date) < new Date() : false;
@@ -281,7 +310,7 @@ export default function PublicSurvey({ params }: PageProps) {
             />
             <div className="text-center">
               <p className="text-sm text-gray-500">
-                {survey.project_name}
+                {survey.title}
               </p>
               {survey.languages.length > 1 && (
                 <div className="flex justify-center mt-2">

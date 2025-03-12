@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeftIcon, PencilIcon, QrCodeIcon, ClipboardIcon, CheckIcon } from '@heroicons/react/24/outline';
-import { getSurvey, getSurveyQRCodeData, getPublicSurvey } from '@/lib/services/survey-service';
+import { getSurvey, getSurveyQRCodeData } from '@/lib/services/survey-service';
 import { Survey } from '@/types/survey';
 import { handleAuthError } from '@/lib/auth-utils';
 import { useToast } from '@/components/ui/use-toast';
@@ -103,13 +103,13 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
         }
         
         // Get the public link if available
-        try {
-          const publicSurvey = await getPublicSurvey(parsedId);
-          if (publicSurvey && 'url' in publicSurvey && typeof publicSurvey.url === 'string') {
-            setPublicLink(publicSurvey.url);
-          }
-        } catch (err) {
-          console.log('No public survey link available');
+        if (data.primary_token) {
+          // Construct public link directly using primary token
+          const baseUrl = window.location.origin;
+          const publicLink = `${baseUrl}/survey/${data.primary_token}`;
+          setPublicLink(publicLink);
+        } else {
+          console.log('No primary token available for public link');
         }
         
         setLoading(false);

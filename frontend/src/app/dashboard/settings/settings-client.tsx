@@ -18,23 +18,33 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fetchClient } from '@/lib/fetch-client';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
+import { Switch } from '@/components/ui/switch';
 
 interface ProcessTextResponse {
   original_text: string;
   language: string;
   processed_words: string[];
-  structured_words: {
-    word: string;
-    assigned_cluster: string;
-  }[];
+  structured_words: StructuredWord[];
   word_count: number;
+  sentences?: {
+    text: string;
+    sentiment: number;
+    index: number;
+  }[];
 }
 
-async function processText(text: string, language: string): Promise<ProcessTextResponse> {
+interface StructuredWord {
+  word: string;
+  assigned_cluster: string;
+  sentence_index?: number;
+}
+
+async function processText(text: string, language: string, useOpenAI: boolean = true): Promise<ProcessTextResponse> {
   try {
     return await fetchClient<ProcessTextResponse>('api/surveys/process-text/', {
       method: 'POST',
-      body: { text, language }
+      body: { text, language, use_openai: useOpenAI }
     });
   } catch (error) {
     console.error('Error processing text:', error);
@@ -50,10 +60,26 @@ export default function SettingsClient() {
   const [isAdding, setIsAdding] = useState(false);
   const [textToProcess, setTextToProcess] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [useOpenAI, setUseOpenAI] = useState(true);
   const [processedWords, setProcessedWords] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [structuredWords, setStructuredWords] = useState<{word: string; assigned_cluster: string}[]>([]);
+  const [structuredWords, setStructuredWords] = useState<StructuredWord[]>([]);
+  const [sentences, setSentences] = useState<{text: string; sentiment: number; index: number}[]>([]);
   const { toast } = useToast();
+
+  // Get sentiment color based on score
+  const getSentimentColor = (score: number) => {
+    if (score > 0.05) return "bg-green-100 border-green-400"; // Positive
+    if (score < -0.05) return "bg-red-100 border-red-400";   // Negative
+    return "bg-gray-100 border-gray-400";                    // Neutral
+  };
+
+  // Get sentiment label based on score
+  const getSentimentLabel = (score: number) => {
+    if (score > 0.05) return "Positive";
+    if (score < -0.05) return "Negative";
+    return "Neutral";
+  };
 
   useEffect(() => {
     loadClusters();
@@ -151,9 +177,15 @@ export default function SettingsClient() {
 
     try {
       setIsProcessing(true);
-      const result = await processText(textToProcess, selectedLanguage);
+      const result = await processText(textToProcess, selectedLanguage, useOpenAI);
+      
+      // Log the response for debugging
+      console.log('Process Text API Response:', result);
+      console.log('Sentences data:', result.sentences);
+      
       setProcessedWords(result.processed_words || []);
       setStructuredWords(result.structured_words || []);
+      setSentences(result.sentences || []);
       
       toast({
         title: 'Text Processed Successfully',
@@ -344,6 +376,20 @@ export default function SettingsClient() {
                     </Select>
                   </div>
                   
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="use-openai"
+                      checked={useOpenAI}
+                      onCheckedChange={setUseOpenAI}
+                    />
+                    <Label htmlFor="use-openai">
+                      Use OpenAI for sentiment analysis 
+                      <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                        {useOpenAI ? 'OpenAI (more accurate)' : 'NLTK (faster)'}
+                      </span>
+                    </Label>
+                  </div>
+                  
                   <div>
                     <Label htmlFor="text-to-process">Text to Process</Label>
                     <Textarea 
@@ -360,6 +406,126 @@ export default function SettingsClient() {
                   </Button>
                 </form>
               </div>
+              
+              {sentences.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">
+                    Sentences with Sentiment Analysis
+                    <span className="ml-2 text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded">
+                      {useOpenAI ? 'OpenAI Analysis' : 'NLTK Analysis'}
+                    </span>
+                  </h3>
+                  
+                  {/* Sentiment summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <Card className="bg-green-50">
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">
+                            {sentences.filter(s => s.sentiment > 0.05).length}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Positive Sentences
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-gray-50">
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-gray-600">
+                            {sentences.filter(s => s.sentiment >= -0.05 && s.sentiment <= 0.05).length}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Neutral Sentences
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    
+                    <Card className="bg-red-50">
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-red-600">
+                            {sentences.filter(s => s.sentiment < -0.05).length}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            Negative Sentences
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {sentences.length > 1 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-medium mb-2">Sentiment Trend</h4>
+                      <div className="h-64 w-full border p-4 rounded-md bg-white">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart
+                            data={sentences.map(s => ({
+                              index: s.index + 1,
+                              sentiment: s.sentiment,
+                              text: s.text.length > 30 ? s.text.substring(0, 30) + '...' : s.text
+                            }))}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="index" label={{ value: 'Sentence Index', position: 'insideBottomRight', offset: -10 }} />
+                            <YAxis label={{ value: 'Sentiment Score', angle: -90, position: 'insideLeft' }} domain={[-1, 1]} />
+                            <Tooltip 
+                              formatter={(value: number) => [value.toFixed(2), 'Sentiment']}
+                              labelFormatter={(label) => `Sentence ${label}`}
+                              content={({ active, payload, label }: any) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="bg-white p-2 border rounded shadow">
+                                      <p className="font-bold">{`Sentence ${label}`}</p>
+                                      <p className="text-sm">{`Sentiment: ${data.sentiment.toFixed(2)}`}</p>
+                                      <p className="text-xs">{data.text}</p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <ReferenceLine y={0} stroke="#666" />
+                            <ReferenceLine y={0.05} stroke="#22c55e" strokeDasharray="3 3" />
+                            <ReferenceLine y={-0.05} stroke="#ef4444" strokeDasharray="3 3" />
+                            <Line 
+                              type="monotone" 
+                              dataKey="sentiment" 
+                              stroke="#3b82f6" 
+                              activeDot={{ r: 8 }}
+                              dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Sentences list */}
+                  <div className="space-y-3 max-h-80 overflow-y-auto p-2">
+                    {sentences.map((sentence, index) => (
+                      <div key={index} className={`p-3 border rounded-md ${getSentimentColor(sentence.sentiment)}`}>
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-semibold">Sentence {sentence.index + 1}</span>
+                          <Badge variant={
+                            sentence.sentiment > 0.05 ? "default" : 
+                            sentence.sentiment < -0.05 ? "destructive" : "secondary"
+                          }>
+                            {getSentimentLabel(sentence.sentiment)} ({sentence.sentiment.toFixed(2)})
+                          </Badge>
+                        </div>
+                        <p className="text-sm">{sentence.text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
               
               {processedWords.length > 0 && (
                 <div className="mt-6">
@@ -381,6 +547,7 @@ export default function SettingsClient() {
                         <TableRow>
                           <TableHead>Word</TableHead>
                           <TableHead>Assigned Cluster</TableHead>
+                          <TableHead>Sentence</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -389,6 +556,11 @@ export default function SettingsClient() {
                             <TableCell>{item.word}</TableCell>
                             <TableCell>
                               <Badge>{item.assigned_cluster}</Badge>
+                            </TableCell>
+                            <TableCell>
+                              {item.sentence_index !== undefined 
+                                ? <Badge variant="outline">Sentence {item.sentence_index + 1}</Badge> 
+                                : '-'}
                             </TableCell>
                           </TableRow>
                         ))}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFieldArray, useFormContext } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 
@@ -27,7 +28,7 @@ const AVAILABLE_LANGUAGES: Language[] = [
 
 // Define the schema (must match the parent form's schema)
 const questionSchema = z.object({
-  id: z.string().optional(),
+  id: z.union([z.number(), z.string()]).optional(),
   order: z.number(),
   type: z.enum(['nps', 'free_text']),
   questions: z.record(z.string(), z.string()),
@@ -35,13 +36,34 @@ const questionSchema = z.object({
   is_required: z.boolean().default(true),
   placeholder: z.string().optional(),
   placeholders: z.record(z.string(), z.string()).optional(),
+  hasAnswers: z.boolean().optional(),
+  answerCount: z.number().optional(),
 });
 
 type QuestionFormValues = {
   questions: z.infer<typeof questionSchema>[];
 };
 
-export default function QuestionForm({ languages }: { languages: string[] }) {
+// Interface for questions with answers
+interface QuestionWithAnswers {
+  id: number;
+  questions: Record<string, string>;
+  answer_count: number;
+}
+
+interface QuestionFormProps {
+  languages: string[];
+  questionsWithAnswers?: QuestionWithAnswers[];
+  hasResponses?: boolean;
+  showDeleteWarning?: boolean;
+}
+
+export default function QuestionForm({ 
+  languages, 
+  questionsWithAnswers = [], 
+  hasResponses = false,
+  showDeleteWarning = false
+}: QuestionFormProps) {
   const { t } = useTranslation('surveys');
   const { control, register, getValues, setValue, watch, formState } = useFormContext<QuestionFormValues>();
   const { fields, append, remove, move } = useFieldArray({
@@ -49,6 +71,14 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
     name: "questions"
   });
 
+  // State for deletion confirmation dialog
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState<{index: number, id?: number | string, hasAnswers: boolean}>({
+    index: -1,
+    id: undefined,
+    hasAnswers: false
+  });
+  
   // Log question validation state
   React.useEffect(() => {
     console.log('QuestionForm validation state:', {
@@ -57,6 +87,24 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
       isValid: !formState.errors.questions
     });
   }, [fields, formState.errors.questions]);
+  
+  // Ensure question IDs are always preserved in form data
+  React.useEffect(() => {
+    // For each field, check if it has a "real" database ID (from initialData)
+    fields.forEach((field, index) => {
+      // Access the actual question data to see if it has a real ID
+      const question = getValues(`questions.${index}`);
+      
+      // If the question has a real ID (from the database), make sure it's set
+      // We need to distinguish between React Hook Form's internal IDs and database IDs
+      if (question && question.id && typeof question.id === 'number') {
+        console.log(`Found database ID ${question.id} for question at index ${index}`);
+      } else {
+        // This is a field without a real ID
+        console.log(`No database ID for question at index ${index}, field id: ${field.id}`);
+      }
+    });
+  }, [fields, getValues]);
 
   // Create a new question with all required fields
   const createNewQuestion = () => {
@@ -75,7 +123,137 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
   const addQuestion = () => {
     const newQuestion = createNewQuestion();
     console.log('Adding new question:', newQuestion);
+    
+    // Log the current state of all questions for debugging
+    console.log('Current questions before adding:', fields.map(field => ({
+      id: field.id,
+      reactHookFormId: field.id, // This is the React Hook Form internal ID
+      questionId: field.id, // This may be the database ID if it exists
+      type: field.type
+    })));
+    
     append(newQuestion);
+    
+    // Log the updated state after adding
+    setTimeout(() => {
+      console.log('Questions after adding new one:', getValues('questions').map((q, index) => ({
+        index,
+        id: q.id,
+        type: q.type
+      })));
+      
+      // Also print full form data to see if IDs are being preserved
+      console.log('Full form data:', getValues());
+    }, 0);
+  };
+  
+  // Check if a question has answers attached
+  const hasAnswers = (questionId?: number | string) => {
+    // If no ID or no responses, return false immediately
+    if (!questionId || !hasResponses) {
+      console.log('hasAnswers: No questionId or no responses', { questionId, hasResponses });
+      return false;
+    }
+    
+    // Check if this is likely a React Hook Form internal ID
+    if (typeof questionId === 'string' && (questionId.startsWith('field_') || questionId.length > 10)) {
+      console.log('This appears to be a React Hook Form internal ID, not a real database ID:', questionId);
+      
+      // Since this is an internal ID, let's try to get the actual question data
+      const questionIndex = fields.findIndex(f => f.id === questionId);
+      if (questionIndex >= 0) {
+        const questionData = getValues(`questions.${questionIndex}`);
+        // Check if the question has the direct hasAnswers flag
+        if (questionData && questionData.hasAnswers) {
+          console.log('Question has answers according to direct flag:', questionData);
+          return true;
+        }
+      }
+      
+      return false;
+    }
+    
+    // Convert questionId to a number for comparison
+    const questionIdNum = Number(questionId);
+    
+    // If conversion failed and we have a NaN, this can't be a real ID
+    if (isNaN(questionIdNum)) {
+      console.log('Could not convert ID to number, likely not a real database ID:', questionId);
+      return false;
+    }
+    
+    // Check if the question has answers
+    const hasAnswersAttached = questionsWithAnswers.some(q => q.id === questionIdNum);
+    
+    // Log the result for debugging
+    console.log('hasAnswers check:', { 
+      questionId, 
+      questionIdNum,
+      hasAnswersAttached,
+      questionsWithAnswers: questionsWithAnswers.map(q => q.id)
+    });
+    
+    return hasAnswersAttached;
+  };
+  
+  // Handle question deletion with confirmation if needed
+  const handleDeleteQuestion = (index: number) => {
+    const question = fields[index];
+    
+    // Access the actual question data to get the real ID
+    const questionData = getValues(`questions.${index}`);
+    const questionId = questionData?.id || question.id;
+    
+    console.log('Question being deleted:', {
+      index,
+      questionId,
+      fieldId: question.id,
+      dataId: questionData?.id,
+      fieldIdType: typeof question.id,
+      dataIdType: typeof questionData?.id,
+      questionData
+    });
+    
+    // First check if the question data itself indicates it has answers
+    let questionHasAnswers = questionData?.hasAnswers === true;
+    
+    // If not, then use the normal hasAnswers check
+    if (!questionHasAnswers) {
+      questionHasAnswers = hasAnswers(questionId);
+    }
+    
+    console.log('handleDeleteQuestion:', {
+      index,
+      questionId,
+      questionHasAnswers,
+      showDeleteWarning,
+      shouldShowWarning: questionHasAnswers && showDeleteWarning,
+      directHasAnswers: questionData?.hasAnswers
+    });
+    
+    // If the question has answers and warnings are enabled, show confirmation
+    if (questionHasAnswers && showDeleteWarning) {
+      setQuestionToDelete({
+        index,
+        id: questionId,
+        hasAnswers: true
+      });
+      setDeleteConfirmOpen(true);
+      console.log('Opening delete confirmation dialog for question with answers');
+    } else {
+      // Otherwise just delete it
+      console.log('Deleting question without confirmation');
+      remove(index);
+    }
+  };
+  
+  // Confirmed deletion after warning
+  const confirmDelete = () => {
+    if (questionToDelete.index >= 0) {
+      remove(questionToDelete.index);
+      setDeleteConfirmOpen(false);
+      setQuestionToDelete({ index: -1, id: undefined, hasAnswers: false });
+    }
   };
 
   // Log validation errors for debugging
@@ -87,7 +265,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
         languages: languages
       });
     }
-  }, [formState.errors.questions, languages]);
+  }, [formState.errors.questions, getValues, languages]);
 
   return (
     <div className="space-y-4">
@@ -142,7 +320,7 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
                     variant="ghost"
                     size="sm"
                     className="text-red-500 hover:text-red-700"
-                    onClick={() => remove(index)}
+                    onClick={() => handleDeleteQuestion(index)}
                     aria-label={t('questions.remove')}
                   >
                     <TrashIcon className="w-4 h-4" />
@@ -223,6 +401,35 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
                 {...register(`questions.${index}.order`)} 
                 value={index} 
               />
+              
+              {/* Important: Preserve the real database ID if it exists */}
+              {field.id && (
+                <>
+                  {(() => {
+                    // Access the real question data to get the real ID
+                    const question = getValues(`questions.${index}`);
+                    const realId = question?.id;
+                    
+                    // Check if this is a real database ID
+                    if (realId && typeof realId === 'number') {
+                      console.log(`Setting real database ID ${realId} for question ${index}`);
+                      // Set the ID explicitly to ensure it's sent to the backend
+                      setValue(`questions.${index}.id`, realId);
+                      return (
+                        <input 
+                          type="hidden" 
+                          {...register(`questions.${index}.id`)}
+                          value={String(realId)} 
+                        />
+                      );
+                    } else {
+                      // This is a new question with a React Hook Form generated ID, don't send ID to backend
+                      console.log(`Skipping ID for new question ${index}, React id: ${field.id}`);
+                      return null;
+                    }
+                  })()}
+                </>
+              )}
             </CardContent>
           </Card>
         ))
@@ -240,6 +447,20 @@ export default function QuestionForm({ languages }: { languages: string[] }) {
           </Button>
         </div>
       )}
+
+      {/* Deletion confirmation dialog */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('questions.deleteWarningTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('questions.deleteWarningDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('questions.deleteWarningCancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>{t('questions.deleteWarningConfirm')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

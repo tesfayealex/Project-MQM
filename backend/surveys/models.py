@@ -174,20 +174,28 @@ class Response(models.Model):
 
 
 class Answer(models.Model):
+    """
+    Represents a user's answer to a survey question.
+    """
     response = models.ForeignKey(Response, related_name='answers', on_delete=models.CASCADE)
-    question = models.ForeignKey(Question, related_name='answers', on_delete=models.CASCADE)
+    question = models.ForeignKey(Question, related_name='answers', on_delete=models.SET_NULL, null=True, blank=True)
     nps_rating = models.IntegerField(null=True, blank=True)
     text_answer = models.TextField(null=True, blank=True)
     sentiment_score = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     processed = models.BooleanField(default=False, help_text="Whether this answer has been processed for word extraction")
+    sentence_sentiments = models.JSONField(
+        default=list, 
+        blank=True, 
+        help_text="List of sentences with sentiment scores: [{'text': 'Sentence text', 'sentiment': 0.5}, ...]"
+    )
 
     def __str__(self):
         return f"Answer to {self.question} ({self.created_at})"
     
     def process_text_answer(self):
         """Process the text answer to extract words and associate them with clusters."""
-        from .utils import process_text
+        from .utils import process_text, analyze_sentences, analyze_sentences_with_openai, process_sentence, assign_clusters_to_words
         
         if not self.text_answer or self.processed:
             return
@@ -196,37 +204,140 @@ class Answer(models.Model):
         language = self.response.language
         survey = self.response.survey
         
-        # Process the text to extract words
-        processed_words = process_text(self.text_answer, language)
+        # 1. Analyze text at sentence level for sentiment
+        sentence_data = analyze_sentences_with_openai(self.text_answer, language)
+        print(sentence_data)
+        self.sentence_sentiments = sentence_data
         
-        if processed_words:
+        # Initialize variables for word processing
+        all_processed_words = []
+        words_to_sentences = {}
+        
+        # 2. Process each sentence to extract words
+        for idx, sentence_info in enumerate(sentence_data):
+            sentence_text = sentence_info['text']
+            sentence_idx = sentence_info['index']
+            
+            # Extract words from this sentence
+            sentence_words = process_sentence(sentence_text, language)
+            print("sentence_words: " + str(sentence_text))
+            print(sentence_words)
+            
+            # Map each word to its source sentence
+            for word in sentence_words:
+                words_to_sentences[word] = {
+                    'text': sentence_text,
+                    'index': sentence_idx
+                }
+            
+            # Add to our complete list of processed words
+            all_processed_words.extend(sentence_words)
+        
+        # 3. Create ResponseWord instances for each processed word
+        if all_processed_words:
+            # Assign clusters to words using the utility function
+            word_clusters = assign_clusters_to_words(self.text_answer, all_processed_words, language, survey)
+            
             # Create ResponseWord instances for each processed word
-            for word in processed_words:
+            for word in all_processed_words:
+                # Get sentence data for this word
+                sentence_data = words_to_sentences.get(word, {})
+                sentence_text = sentence_data.get('text', '')
+                sentence_idx = sentence_data.get('index', None)
+                
+                # Get assigned cluster from word_clusters dictionary
+                assigned_cluster = word_clusters.get(word, 'Other')
+                
                 # Create the ResponseWord instance
                 response_word = ResponseWord.objects.create(
                     response=self.response,
                     answer=self,
                     word=word,
                     original_text=self.text_answer,
-                    language=language
+                    language=language,
+                    sentence_text=sentence_text,
+                    sentence_index=sentence_idx,
+                    assigned_cluster=assigned_cluster
                 )
                 
-                # Associate with custom clusters if applicable
-                active_clusters = CustomWordCluster.objects.filter(is_active=True)
-                for cluster in active_clusters:
-                    if cluster.matches_word(word):
-                        response_word.custom_clusters.add(cluster)
+                # Find and associate with the matching custom cluster
+                from .models import CustomWordCluster
+                if assigned_cluster != 'Other':
+                    try:
+                        # Check if this cluster already exists, if not create it
+                        cluster_obj, created = CustomWordCluster.objects.get_or_create(
+                            name=assigned_cluster,
+                            defaults={
+                                'created_by': self.response.survey.created_by,
+                                'is_active': True,
+                                'description': f'Auto-created cluster from survey {self.response.survey.description}'
+                            }
+                        )
+                        
+                        response_word.custom_clusters.add(cluster_obj)
                         
                         # Update the last_processed timestamp for the cluster
-                        cluster.last_processed = timezone.now()
-                        cluster.save(update_fields=['last_processed'])
+                        cluster_obj.last_processed = timezone.now()
+                        cluster_obj.save(update_fields=['last_processed'])
                         
                         # Update the word count asynchronously
-                        cluster.update_word_count()
+                        cluster_obj.update_word_count()
+                    except Exception as e:
+                        print(f"Error associating word with cluster: {str(e)}")
         
-        # Mark as processed
+        # 4. Mark as processed and save sentence sentiment data
         self.processed = True
-        self.save(update_fields=['processed'])
+        self.save(update_fields=['processed', 'sentence_sentiments'])
+
+    def get_average_sentiment(self):
+        """Calculate the average sentiment score across all sentences in this answer."""
+        if not self.sentence_sentiments:
+            return 0.0
+            
+        total_sentiment = sum(sent.get('sentiment', 0) for sent in self.sentence_sentiments)
+        return total_sentiment / len(self.sentence_sentiments) if self.sentence_sentiments else 0.0
+    
+    def get_positive_sentences(self):
+        """Return a list of sentences with positive sentiment (sentiment > 0.05)."""
+        if not self.sentence_sentiments:
+            return []
+            
+        return [sent for sent in self.sentence_sentiments if sent.get('sentiment', 0) > 0.05]
+    
+    def get_negative_sentences(self):
+        """Return a list of sentences with negative sentiment (sentiment < -0.05)."""
+        if not self.sentence_sentiments:
+            return []
+            
+        return [sent for sent in self.sentence_sentiments if sent.get('sentiment', 0) < -0.05]
+    
+    def get_neutral_sentences(self):
+        """Return a list of sentences with neutral sentiment (-0.05 <= sentiment <= 0.05)."""
+        if not self.sentence_sentiments:
+            return []
+            
+        return [sent for sent in self.sentence_sentiments 
+                if -0.05 <= sent.get('sentiment', 0) <= 0.05]
+    
+    def get_sentiment_distribution(self):
+        """Return a dictionary with the distribution of sentiment categories."""
+        if not self.sentence_sentiments:
+            return {'positive': 0, 'negative': 0, 'neutral': 0, 'total': 0}
+            
+        positive = len(self.get_positive_sentences())
+        negative = len(self.get_negative_sentences())
+        neutral = len(self.get_neutral_sentences())
+        total = len(self.sentence_sentiments)
+        
+        return {
+            'positive': positive,
+            'negative': negative,
+            'neutral': neutral,
+            'total': total,
+            'positive_pct': (positive / total) * 100 if total else 0,
+            'negative_pct': (negative / total) * 100 if total else 0,
+            'neutral_pct': (neutral / total) * 100 if total else 0
+        }
 
 
 class WordCluster(models.Model):
@@ -334,6 +445,8 @@ class ResponseWord(models.Model):
     answer = models.ForeignKey(Answer, related_name='extracted_words', on_delete=models.CASCADE)
     word = models.CharField(max_length=100, help_text="The extracted word or short phrase")
     original_text = models.TextField(help_text="The original text context where this word appeared")
+    sentence_text = models.TextField(blank=True, null=True, help_text="The sentence this word was extracted from")
+    sentence_index = models.IntegerField(null=True, blank=True, help_text="Index of the sentence this word was extracted from")
     frequency = models.IntegerField(default=1, help_text="Frequency of this word in the response")
     sentiment_score = models.FloatField(default=0.0, help_text="Sentiment score for this word (-1 to 1)")
     clusters = models.ManyToManyField(WordCluster, related_name='words', blank=True)
@@ -351,6 +464,49 @@ class ResponseWord(models.Model):
 
     def __str__(self):
         return f"{self.word} (Sentiment: {self.sentiment_score:.2f})"
+
+    def get_sentence_sentiment(self):
+        """
+        Return the sentiment score of the sentence this word belongs to.
+        Returns None if sentence data isn't available.
+        """
+        if not self.answer or not self.sentence_index:
+            return None
+            
+        # Find the sentence in the answer's sentence_sentiments data
+        for sent in self.answer.sentence_sentiments:
+            if sent.get('index') == self.sentence_index:
+                return sent.get('sentiment', 0)
+                
+        return None
+        
+    def get_sentence_sentiment_category(self):
+        """
+        Return the sentiment category (positive, negative, neutral) of the 
+        sentence this word belongs to.
+        """
+        sentiment = self.get_sentence_sentiment()
+        
+        if sentiment is None:
+            return 'unknown'
+        elif sentiment > 0.05:
+            return 'positive'
+        elif sentiment < -0.05:
+            return 'negative'
+        else:
+            return 'neutral'
+            
+    def is_in_positive_sentence(self):
+        """Return True if this word appears in a positive sentence."""
+        return self.get_sentence_sentiment_category() == 'positive'
+        
+    def is_in_negative_sentence(self):
+        """Return True if this word appears in a negative sentence."""
+        return self.get_sentence_sentiment_category() == 'negative'
+        
+    def is_in_neutral_sentence(self):
+        """Return True if this word appears in a neutral sentence."""
+        return self.get_sentence_sentiment_category() == 'neutral'
 
 
 class SurveyAnalysisSummary(models.Model):
@@ -469,4 +625,32 @@ def process_answer_text(sender, instance, created, **kwargs):
     # Only process if there's a text_answer and it hasn't been processed yet
     if instance.text_answer and not instance.processed:
         instance.process_text_answer()
+
+
+# Signal to process survey responses asynchronously
+@receiver(post_save, sender=Response)
+def process_response_answers(sender, instance, created, **kwargs):
+    """
+    Processes all answers in a response asynchronously when a new response is created.
+    This signal runs after the HTTP response is sent to the user, making the survey submission faster.
+    """
+    if created:  # Only process for newly created responses
+        # Set up a task to process all text answers in this response
+        # This runs in the background after the HTTP response is returned
+        from threading import Thread
+        
+        def process_answers_task():
+            try:
+                # Process all text answers in this response
+                for answer in instance.answers.filter(text_answer__isnull=False):
+                    if answer.text_answer.strip():  # Skip empty answers
+                        try:
+                            answer.process_text_answer()
+                        except Exception as e:
+                            print(f"Error processing answer {answer.id}: {str(e)}")
+            except Exception as e:
+                print(f"Error in background task for response {instance.id}: {str(e)}")
+        
+        # Start background thread
+        Thread(target=process_answers_task).start()
 

@@ -360,11 +360,13 @@ def assign_clusters_to_words(text, processed_words, language='en', survey=None):
             template_clusters = list(survey.template.clusters.filter(is_active=True).values_list('name', flat=True))
             if template_clusters:
                 clusters = template_clusters
-                
+        print("template_clusters: " )
+        print(clusters)
         # If no template clusters were found, fall back to all active clusters
         if not clusters:
             clusters = list(CustomWordCluster.objects.filter(is_active=True).values_list('name', flat=True))
-            
+        print("clusters: " )
+        print(clusters)
         if not clusters:
             logger.warning("No active custom clusters found for assignment")
             clusters = ["Other"]  # Default if no custom clusters exist
@@ -714,4 +716,471 @@ def process_survey_and_assign_clusters(response_id):
     except Response.DoesNotExist:
         logger.error(f"Response with ID {response_id} does not exist")
     except Exception as e:
-        logger.error(f"Error processing survey response {response_id}: {str(e)}") 
+        logger.error(f"Error processing survey response {response_id}: {str(e)}")
+
+def analyze_sentences(text, language='en'):
+    """
+    Split text into sentences and analyze the sentiment of each sentence.
+    Args:
+        text: Text to analyze
+        language: Language code of the text
+    Returns:
+        List of dictionaries with sentence text and sentiment score: 
+        [{'text': 'Sentence text', 'sentiment': 0.5}, ...]
+    """
+    import spacy
+    import logging
+    import nltk
+    from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Ensure the required NLTK packages are downloaded
+        nltk.download('punkt', quiet=True)
+        nltk.download('vader_lexicon', quiet=True)
+        
+        # Initialize sentiment analyzer
+        sid = SentimentIntensityAnalyzer()
+        
+        # Load spaCy model for the specified language
+        nlp = load_spacy_model(language)
+        
+        # If no spaCy model is available, fall back to NLTK sentence tokenizer
+        if nlp is None:
+            sentences = nltk.sent_tokenize(text)
+        else:
+            # Use spaCy for sentence segmentation
+            doc = nlp(text)
+            sentences = [sent.text.strip() for sent in doc.sents]
+        
+        # Analyze sentiment for each sentence
+        result = []
+        for i, sentence in enumerate(sentences):
+            if sentence.strip():  # Skip empty sentences
+                # Get sentiment score
+                sentiment_scores = sid.polarity_scores(sentence)
+                compound_score = sentiment_scores['compound']
+                
+                # Add sentence and sentiment to result
+                result.append({
+                    'text': sentence,
+                    'sentiment': compound_score,
+                    'index': i
+                })
+        
+        logger.info(f"Analyzed {len(result)} sentences")
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error analyzing sentences: {str(e)}")
+        return []
+
+def process_sentence(sentence, language='en'):
+    """
+    Process a sentence to extract meaningful words.
+    Args:
+        sentence: Text sentence to process
+        language: Language code of the text
+    Returns:
+        List of extracted words from the sentence
+    """
+    import spacy
+    import logging
+    import nltk
+    from nltk.corpus import stopwords
+    
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # Ensure the required NLTK packages are downloaded
+        nltk.download('stopwords', quiet=True)
+        
+        # Get stop words for the specified language
+        try:
+            stop_words = set(stopwords.words(language if language != 'de' else 'german'))
+        except:
+            # Fall back to English stop words if the language is not supported
+            stop_words = set(stopwords.words('english'))
+        
+        # Load spaCy model for the specified language
+        nlp = load_spacy_model(language)
+        
+        processed_words = []
+        
+        # If no spaCy model is available, fall back to simple word tokenization
+        if nlp is None:
+            words = nltk.word_tokenize(sentence.lower())
+            for word in words:
+                if (word not in stop_words and 
+                    word.isalnum() and 
+                    len(word) >= 3):
+                    processed_words.append(word)
+        else:
+            # Use spaCy for more accurate tokenization and lemmatization
+            doc = nlp(sentence)
+            
+            # Extract words, filter out stop words, punctuation, and short words
+            for token in doc:
+                word = token.lemma_.lower()
+                
+                # Skip stop words, punctuation, and short words (less than 3 characters)
+                if (word not in stop_words and 
+                    not token.is_punct and 
+                    not token.is_space and 
+                    len(word) >= 3):
+                    processed_words.append(word)
+        
+        return processed_words
+        
+    except Exception as e:
+        logger.error(f"Error processing sentence: {str(e)}")
+        return []
+
+def get_survey_sentence_sentiment_analysis(survey):
+    """
+    Analyze sentence sentiments for an entire survey.
+    
+    Args:
+        survey: Survey model instance
+        
+    Returns:
+        Dictionary containing sentiment statistics at the sentence level
+    """
+    from .models import Response, Answer
+    
+    # Get all responses for this survey
+    responses = Response.objects.filter(survey=survey)
+    
+    # Initialize result dictionary
+    result = {
+        'total_sentences': 0,
+        'positive_sentences': 0,
+        'negative_sentences': 0,
+        'neutral_sentences': 0,
+        'avg_sentiment': 0,
+        'sentiment_by_question': {},
+        'sentiment_distribution': {
+            'positive_pct': 0,
+            'negative_pct': 0,
+            'neutral_pct': 0
+        },
+        'top_positive_sentences': [],
+        'top_negative_sentences': [],
+        'sentences_by_cluster': {},
+    }
+    
+    # Track all sentences and their sentiment scores
+    all_sentences = []
+    
+    # Process all answers containing text responses
+    for response in responses:
+        text_answers = Answer.objects.filter(
+            response=response,
+            text_answer__isnull=False,
+            processed=True
+        ).exclude(text_answer='')
+        
+        for answer in text_answers:
+            # Skip answers without sentence sentiment data
+            if not answer.sentence_sentiments:
+                continue
+                
+            # Get question text for grouping
+            question_text = answer.question.text
+            if question_text not in result['sentiment_by_question']:
+                result['sentiment_by_question'][question_text] = {
+                    'total': 0,
+                    'positive': 0,
+                    'negative': 0,
+                    'neutral': 0,
+                    'avg_sentiment': 0,
+                }
+            
+            # Process sentence sentiments
+            question_total_sentiment = 0
+            
+            for sentence in answer.sentence_sentiments:
+                # Skip sentences without sentiment scores
+                if 'sentiment' not in sentence:
+                    continue
+                    
+                sent_text = sentence.get('text', '')
+                sent_score = sentence.get('sentiment', 0)
+                
+                # Add to our list of all sentences
+                all_sentences.append({
+                    'text': sent_text,
+                    'sentiment': sent_score,
+                    'question': question_text,
+                    'response_id': response.id,
+                })
+                
+                # Update counters
+                result['total_sentences'] += 1
+                question_total_sentiment += sent_score
+                
+                # Categorize sentiment
+                if sent_score > 0.05:
+                    result['positive_sentences'] += 1
+                    result['sentiment_by_question'][question_text]['positive'] += 1
+                elif sent_score < -0.05:
+                    result['negative_sentences'] += 1
+                    result['sentiment_by_question'][question_text]['negative'] += 1
+                else:
+                    result['neutral_sentences'] += 1
+                    result['sentiment_by_question'][question_text]['neutral'] += 1
+                
+                # Update question totals
+                result['sentiment_by_question'][question_text]['total'] += 1
+            
+            # Calculate average sentiment for this question if there are sentences
+            if result['sentiment_by_question'][question_text]['total'] > 0:
+                result['sentiment_by_question'][question_text]['avg_sentiment'] = (
+                    question_total_sentiment / result['sentiment_by_question'][question_text]['total']
+                )
+    
+    # Calculate overall average sentiment if we have sentences
+    if result['total_sentences'] > 0:
+        total_sentiment = sum(s['sentiment'] for s in all_sentences)
+        result['avg_sentiment'] = total_sentiment / result['total_sentences']
+    
+    # Calculate sentiment distribution
+    if result['total_sentences'] > 0:
+        result['sentiment_distribution']['positive_pct'] = (
+            result['positive_sentences'] / result['total_sentences'] * 100
+        )
+        result['sentiment_distribution']['negative_pct'] = (
+            result['negative_sentences'] / result['total_sentences'] * 100
+        )
+        result['sentiment_distribution']['neutral_pct'] = (
+            result['neutral_sentences'] / result['total_sentences'] * 100
+        )
+    
+    # Sort sentences by sentiment to find top positive and negative ones
+    sorted_sentences = sorted(all_sentences, key=lambda x: x['sentiment'])
+    
+    # Get top 10 most negative sentences
+    result['top_negative_sentences'] = sorted_sentences[:10] if len(sorted_sentences) >= 10 else sorted_sentences[:]
+    
+    # Get top 10 most positive sentences
+    result['top_positive_sentences'] = sorted_sentences[-10:][::-1] if len(sorted_sentences) >= 10 else sorted_sentences[::-1]
+    
+    # Analyze sentences by cluster
+    # First, get all words and their clusters
+    from .models import ResponseWord, CustomWordCluster
+    from django.db.models import Count
+    
+    # Get all active clusters
+    clusters = CustomWordCluster.objects.filter(is_active=True)
+    
+    # Analyze each cluster
+    for cluster in clusters:
+        cluster_name = cluster.name
+        result['sentences_by_cluster'][cluster_name] = {
+            'total_sentences': 0,
+            'positive_sentences': 0,
+            'negative_sentences': 0,
+            'neutral_sentences': 0,
+            'avg_sentiment': 0,
+            'example_sentences': []
+        }
+        
+        # Get all words in this cluster from the survey
+        cluster_words = ResponseWord.objects.filter(
+            response__survey=survey,
+            custom_clusters=cluster
+        ).select_related('answer')
+        
+        # Track sentences associated with this cluster
+        cluster_sentences = {}
+        
+        # Process each word
+        for word in cluster_words:
+            # Skip words without sentence data
+            if not word.sentence_text or word.sentence_index is None:
+                continue
+                
+            # Create a unique key for this sentence
+            sentence_key = f"{word.answer.id}_{word.sentence_index}"
+            
+            # Skip if we've already processed this sentence
+            if sentence_key in cluster_sentences:
+                continue
+                
+            # Get the sentence sentiment from the word
+            sent_score = word.get_sentence_sentiment()
+            if sent_score is None:
+                continue
+                
+            # Add to our tracked sentences
+            cluster_sentences[sentence_key] = {
+                'text': word.sentence_text,
+                'sentiment': sent_score
+            }
+            
+            # Update counters
+            result['sentences_by_cluster'][cluster_name]['total_sentences'] += 1
+            
+            # Categorize sentiment
+            if sent_score > 0.05:
+                result['sentences_by_cluster'][cluster_name]['positive_sentences'] += 1
+            elif sent_score < -0.05:
+                result['sentences_by_cluster'][cluster_name]['negative_sentences'] += 1
+            else:
+                result['sentences_by_cluster'][cluster_name]['neutral_sentences'] += 1
+        
+        # Calculate average sentiment for this cluster if there are sentences
+        if cluster_sentences:
+            total_sentiment = sum(s['sentiment'] for s in cluster_sentences.values())
+            result['sentences_by_cluster'][cluster_name]['avg_sentiment'] = (
+                total_sentiment / len(cluster_sentences)
+            )
+            
+            # Add example sentences (up to 5)
+            sorted_cluster_sentences = sorted(
+                cluster_sentences.values(), 
+                key=lambda x: abs(x['sentiment']),
+                reverse=True
+            )
+            result['sentences_by_cluster'][cluster_name]['example_sentences'] = sorted_cluster_sentences[:5]
+    
+    return result 
+
+def analyze_sentences_with_openai(text, language='en'):
+    """
+    Split text into sentences and analyze the sentiment of each sentence using OpenAI.
+    Args:
+        text: Text to analyze
+        language: Language code of the text
+    Returns:
+        List of dictionaries with sentence text and sentiment score: 
+        [{'text': 'Sentence text', 'sentiment': 0.5, 'index': 0}, ...]
+    """
+    import json
+    import logging
+    import os
+    import spacy
+    import nltk
+    from openai import OpenAI
+
+    logger = logging.getLogger(__name__)
+    
+    try:
+        # First, split the text into sentences using spaCy or NLTK
+        nltk.download('punkt', quiet=True)
+        
+        # Load spaCy model for the specified language
+        nlp = load_spacy_model(language)
+        
+        # If no spaCy model is available, fall back to NLTK sentence tokenizer
+        if nlp is None:
+            sentences = nltk.sent_tokenize(text)
+        else:
+            # Use spaCy for sentence segmentation
+            doc = nlp(text)
+            sentences = [sent.text.strip() for sent in doc.sents]
+        
+        # Filter out empty sentences
+        sentences = [s for s in sentences if s.strip()]
+        
+        if not sentences:
+            logger.warning("No sentences found in the text")
+            return []
+        
+        # Call the OpenAI API to analyze sentiments
+        try:
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                logger.error("OPENAI_API_KEY not found in environment variables")
+                return []
+                
+            client = OpenAI(api_key=api_key)
+            
+            # Read the system prompt
+            with open(os.path.join(os.path.dirname(__file__), 'sentiment_analysis_prompt.txt'), 'r') as file:
+                system_prompt = file.read()
+            
+            # Prepare the user message with the sentences
+            user_message = f"Language: {language}\n\nSentences to analyze:\n\n"
+            for i, sentence in enumerate(sentences):
+                user_message += f"{i+1}. {sentence}\n"
+            
+            # Call the OpenAI API
+            completion = client.chat.completions.create(
+                model="gpt-4o-mini",  # Or another suitable model
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                response_format={"type": "json_object"}
+            )
+            
+            # Parse the response
+            response_content = completion.choices[0].message.content
+            
+            try:
+                result_json = json.loads(response_content)
+                sentence_sentiments = []
+                
+                # Handle different response formats
+                if isinstance(result_json, list):
+                    # Direct array format
+                    sentence_analysis = result_json
+                elif "sentences" in result_json:
+                    # Nested under "sentences" key
+                    sentence_analysis = result_json.get("sentences", [])
+                elif "analysis" in result_json:
+                    # Nested under "analysis" key
+                    sentence_analysis = result_json.get("analysis", [])
+                else:
+                    # Try to find any array in the response
+                    for key, value in result_json.items():
+                        if isinstance(value, list) and len(value) > 0:
+                            sentence_analysis = value
+                            break
+                    else:
+                        sentence_analysis = []
+                
+                # Process the sentence analysis and add index
+                result = []
+                sentence_map = {s.lower().strip(): i for i, s in enumerate(sentences)}
+                
+                
+                for i, analysis in enumerate(sentence_analysis):
+                    if isinstance(analysis, dict) and "text" in analysis and "sentiment_score" in analysis:
+                        text = analysis["text"]
+                        sentiment = analysis["sentiment_score"]
+                        
+                        # Find the index of this sentence in the original list
+                        # Try exact match first, then lowercase and stripped
+                        # if text in sentences:
+                        #     index = sentences.index(text)
+                        # else:
+                        #     # Try to find by normalizing
+                        #     text_normalized = text.lower().strip()
+                        #     index = sentence_map.get(text_normalized, i)
+                        
+                        result.append({
+                            "text": text,
+                            "sentiment": sentiment,
+                            "index": i
+                        })
+                
+                # Sort by index to maintain original sentence order
+                result.sort(key=lambda x: x["index"])
+                
+                logger.info(f"OpenAI analyzed {len(result)} sentences")
+                return result
+                
+            except json.JSONDecodeError:
+                logger.error(f"Failed to parse OpenAI response as JSON: {response_content}")
+                return []
+                
+        except Exception as e:
+            logger.error(f"Error calling OpenAI API for sentiment analysis: {str(e)}")
+            return []
+            
+    except Exception as e:
+        logger.error(f"Error analyzing sentences with OpenAI: {str(e)}")
+        return [] 

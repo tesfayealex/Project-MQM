@@ -1,14 +1,14 @@
-
-FROM node:16-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy project code and build
 COPY . .
+RUN npm run lint --fix || :
 RUN npm run build
 
 EXPOSE 3000

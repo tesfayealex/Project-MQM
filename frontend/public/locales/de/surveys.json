@@ -79,7 +79,12 @@
       "daily": "Tägliche Antworten",
       "devices": "Gerätenutzung",
       "locations": "Antwortstandorte"
-    }
+    },
+    "sentenceAnalysis": "Satzanalyse",
+    "positive": "Positiv",
+    "negative": "Negativ",
+    "neutral": "Neutral",
+    "sentiment": "Stimmung"
   },
   "analysis": {
     "title": "Antwortanalyse",

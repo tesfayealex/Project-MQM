@@ -1,6 +1,11 @@
 from rest_framework import serializers
 from .models import Survey, Question, Response, Answer, SurveyToken, WordCluster, ResponseWord, SurveyAnalysisSummary, CustomWordCluster, Template, TemplateQuestion
 from django.db import models
+import logging
+from django.db import transaction
+import json
+
+logger = logging.getLogger(__name__)
 
 
 class QuestionSerializer(serializers.ModelSerializer):
@@ -42,7 +47,7 @@ class SurveySerializer(serializers.ModelSerializer):
     questions = QuestionSerializer(many=True, read_only=True)
     response_count = serializers.SerializerMethodField()
     tokens = SurveyTokenSerializer(many=True, read_only=True)
-
+    
     class Meta:
         model = Survey
         fields = [
@@ -74,7 +79,8 @@ class SurveySerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ['created_by', 'created_at', 'updated_at', 'response_count', 'primary_token']
         extra_kwargs = {
-            'token': {'required': False, 'allow_blank': True, 'allow_null': True}
+            'token': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'template': {'required': False, 'allow_null': True}
         }
 
     def get_response_count(self, obj):
@@ -120,48 +126,210 @@ class SurveySerializer(serializers.ModelSerializer):
         return value
 
     def update(self, instance, validated_data):
-        # Set a unique dummy value for the legacy token field
-        # We're not using this field anymore, but we need to set it to something unique
-        import random
-        import string
-        random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-        validated_data['token'] = random_token
-            
-        # Update the survey instance
+        """
+        Update a survey and its related questions.
+        This method handles several complex scenarios:
+        1. Updates survey fields
+        2. Updates, creates, or deletes questions based on the provided data
+        3. Preserves answers when deleting questions that have answers
+        """
+        from django.db import transaction
+
+        # Debug: Print the raw request data to see what's being sent
+        request_data = self.context.get('request').data
+        logger.info(f"Survey {instance.id} update: Raw request data keys: {list(request_data.keys())}")
+        
+        if 'questions' in request_data:
+            logger.info(f"Survey {instance.id} update: Raw questions data length: {len(request_data['questions'])}")
+            # Print a sample of the first question
+            if len(request_data['questions']) > 0:
+                logger.info(f"Survey {instance.id} update: First question sample: {json.dumps(request_data['questions'][0], indent=2)}")
+        else:
+            logger.info(f"Survey {instance.id} update: No 'questions' key in raw request data")
+
+        # Extract questions data before updating main survey
+        questions_data = validated_data.pop('questions', None)
+
+        print("Questions Data:")
+        print(questions_data)
+        
+        # Debug: Print what's in validated_data
+        logger.info(f"Survey {instance.id} update: validated_data keys: {list(validated_data.keys())}")
+        
+        # If questions_data is None but exists in the raw request, try to get it from there
+        if questions_data is None and 'questions' in request_data:
+            logger.info(f"Survey {instance.id} update: questions_data is None but exists in raw request, trying to use that")
+            questions_data = request_data['questions']
+        
+        print("Questions Data:")
+        print(questions_data)
+        # First update the survey fields
         survey = super().update(instance, validated_data)
         
-        # Handle tokens update if present in the request data
-        tokens_data = self.context.get('request').data.get('tokens')
-        if tokens_data is not None:
-            # First, we'll gather existing token IDs to determine what to keep
-            existing_token_ids = set(survey.tokens.values_list('id', flat=True))
+        # IMPORTANT: If questions_data is None (not provided), don't modify existing questions
+        # This is to prevent accidental deletion of all questions
+        if questions_data is None:
+            logger.info(f"Survey {survey.id} update: No questions data provided, keeping existing questions")
+            return survey
             
-            # Track the IDs that are updated
-            updated_token_ids = set()
-            
-            # Update existing tokens and create new ones
-            for token_data in tokens_data:
-                token_id = token_data.get('id')
+        logger.info(f"Survey {survey.id} update: Processing {len(questions_data)} questions")
+        
+        # Get existing questions
+        existing_questions = list(instance.questions.all().order_by('order'))
+        
+        # Store IDs as integers for consistent comparison
+        # Create a mapping of existing question objects by their ID for direct access
+        existing_question_ids = set()
+        existing_questions_by_id = {}
+        for q in existing_questions:
+            if q.id is not None:
+                q_id = int(q.id)
+                existing_question_ids.add(q_id)
+                existing_questions_by_id[q_id] = q
+        
+        existing_question_count = len(existing_questions)
+        
+        logger.info(f"Survey {survey.id} update: Found {existing_question_count} existing questions with IDs: {existing_question_ids}")
+        
+        # Check if the incoming question data contains any IDs at all
+        any_questions_have_ids = False
+        for q_data in questions_data:
+            if 'id' in q_data and q_data['id'] is not None:
+                any_questions_have_ids = True
+                break
                 
-                # If this token has an ID, update the existing record
-                if token_id and token_id in existing_token_ids:
-                    token = SurveyToken.objects.get(id=token_id)
-                    token.token = token_data.get('token', token.token)
-                    token.description = token_data.get('description', token.description)
-                    token.save()
-                    updated_token_ids.add(token_id)
-                else:
-                    # Create a new token
-                    SurveyToken.objects.create(
-                        survey=survey,
-                        token=token_data.get('token'),
-                        description=token_data.get('description', 'Token')
-                    )
+        logger.info(f"Survey {survey.id} update: Incoming questions have IDs: {any_questions_have_ids}")
+        
+        # Process the incoming question data for better debugging
+        incoming_questions_info = []
+        for i, q_data in enumerate(questions_data):
+            q_id = q_data.get('id')
+            q_id_str = str(q_id) if q_id is not None else 'NEW'
+            q_type = q_data.get('type', 'unknown')
+            incoming_questions_info.append(f"Q{i+1}: ID={q_id_str}, Type={q_type}")
+        
+        logger.info(f"Survey {survey.id} update: Incoming questions: {', '.join(incoming_questions_info)}")
+        
+        # Check which questions have answers
+        questions_with_answers = set(
+            Answer.objects.filter(question__in=existing_questions)
+            .values_list('question_id', flat=True)
+            .distinct()
+        )
+        
+        logger.info(f"Survey {survey.id} update: Questions with answers: {questions_with_answers}")
+        
+        # We'll use a transaction to ensure all changes happen together or not at all
+        with transaction.atomic():
+            # If it's an exact replacement of all questions (same count, no IDs provided)
+            # OR if no questions have IDs at all, use in-place updating to preserve IDs
+            if (len(questions_data) == existing_question_count and 
+                (not any_questions_have_ids or not any('id' in q and q['id'] is not None for q in questions_data))):
+                
+                logger.info(f"Survey {survey.id} update: Using in-place update strategy (count: {existing_question_count}, no IDs sent)")
+                
+                # Update existing questions in place based on order
+                for i, (question, question_data) in enumerate(zip(existing_questions, questions_data)):
+                    # Remove order from data as we're setting it explicitly
+                    question_data.pop('order', None)
+                    # Remove ID if present to avoid conflicts
+                    question_data.pop('id', None)
+                    # Update fields
+                    for attr, value in question_data.items():
+                        setattr(question, attr, value)
+                    # Ensure order is maintained
+                    question.order = i + 1
+                    question.save()
+                    logger.info(f"Survey {survey.id} update: Updated question {question.id} in-place at position {i+1}")
+                
+                # If we have more questions in the incoming data than existing ones, create new ones
+                if len(questions_data) > existing_question_count:
+                    for i, question_data in enumerate(questions_data[existing_question_count:], existing_question_count + 1):
+                        question_data.pop('order', None)
+                        question_data.pop('id', None)  # Remove ID if present
+                        new_question = Question.objects.create(survey=survey, order=i, **question_data)
+                        logger.info(f"Survey {survey.id} update: Created new question ID {new_question.id} at position {i}")
+                
+                return survey
             
-            # Delete tokens that weren't included in the update
-            tokens_to_delete = existing_token_ids - updated_token_ids
-            if tokens_to_delete:
-                SurveyToken.objects.filter(id__in=tokens_to_delete).delete()
+            # If we get here, at least some questions have IDs, so we'll use the standard update/create/delete logic
+            logger.info(f"Survey {survey.id} update: Using standard update logic (some questions have IDs)")
+            
+            # Track which question IDs are in the updated data
+            updated_question_ids = set()
+            
+            # First pass: Update existing questions or create new ones
+            for order, question_data in enumerate(questions_data, 1):
+                question_id = question_data.pop('id', None)
+                question_data.pop('order', None)  # We'll set order explicitly
+                
+                # Convert ID to integer for comparison if it's not None
+                original_id = question_id  # Keep original for logging
+                if question_id is not None:
+                    try:
+                        question_id = int(question_id)
+                    except (ValueError, TypeError):
+                        # If conversion fails, treat as a new question
+                        logger.warning(f"Survey {survey.id} update: Could not convert question ID {original_id} to integer, treating as new question")
+                        question_id = None
+                
+                # Debug logging for each question processed
+                logger.info(f"Survey {survey.id} update: Processing question at position {order} with ID {question_id} (original: {original_id})")
+                
+                if question_id is not None and question_id in existing_question_ids:
+                    # Update existing question directly from our mapping
+                    question = existing_questions_by_id[question_id]
+                    for attr, value in question_data.items():
+                        setattr(question, attr, value)
+                    question.order = order
+                    question.save()
+                    updated_question_ids.add(question_id)
+                    logger.info(f"Survey {survey.id} update: Updated existing question ID {question_id}")
+                else:
+                    # Create new question
+                    new_question = Question.objects.create(survey=survey, order=order, **question_data)
+                    logger.info(f"Survey {survey.id} update: Created new question ID {new_question.id}")
+            
+            # Calculate which questions were NOT included in the update (for deletion)
+            questions_to_delete = existing_question_ids - updated_question_ids
+            
+            # Debug logging for deletion
+            logger.info(f"Survey {survey.id} update: Questions marked for deletion: {questions_to_delete}")
+            
+            if questions_to_delete:
+                # Check if we need to handle questions with answers
+                questions_to_delete_with_answers = questions_to_delete.intersection(questions_with_answers)
+                questions_to_delete_without_answers = questions_to_delete - questions_with_answers
+                
+                # Log what we're doing for debugging
+                logger.info(f"Survey {survey.id} update: Deleting questions without answers: {questions_to_delete_without_answers}")
+                logger.info(f"Survey {survey.id} update: Handling questions with answers: {questions_to_delete_with_answers}")
+                
+                # Delete questions without answers normally
+                if questions_to_delete_without_answers:
+                    deleted_count = Question.objects.filter(id__in=questions_to_delete_without_answers).delete()[0]
+                    logger.info(f"Survey {survey.id} update: Deleted {deleted_count} questions without answers")
+                
+                # Special handling for questions with answers: remove the question_id reference from answers
+                if questions_to_delete_with_answers:
+                    # For each question with answers that needs to be deleted:
+                    # 1. Find all answers for this question
+                    # 2. Set question_id to NULL for affected answers to preserve the answer data
+                    # 3. Then delete the question
+                    for question_id in questions_to_delete_with_answers:
+                        # Get the answers for this question
+                        answers = Answer.objects.filter(question_id=question_id)
+                        answer_count = answers.count()
+                        
+                        # Set question_id to NULL for affected answers to preserve the answer data
+                        # Our model has on_delete=SET_NULL and null=True
+                        update_count = Answer.objects.filter(question_id=question_id).update(question=None)
+                        
+                        # Now we can safely delete the question
+                        delete_count = Question.objects.filter(id=question_id).delete()[0]
+                        
+                        # Log the operation
+                        logger.info(f"Survey {survey.id} update: Preserved {update_count}/{answer_count} answers while deleting question {question_id} (deleted: {delete_count})")
         
         return survey
 
@@ -171,8 +339,8 @@ class AnswerSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Answer
-        fields = ['id', 'question', 'nps_rating', 'text_answer', 'sentiment_score', 'created_at']
-        read_only_fields = ['created_at', 'sentiment_score']
+        fields = ['id', 'question', 'nps_rating', 'text_answer', 'sentiment_score', 'created_at', 'sentence_sentiments']
+        read_only_fields = ['created_at', 'sentiment_score', 'sentence_sentiments']
 
 
 class ResponseSerializer(serializers.ModelSerializer):
@@ -384,18 +552,185 @@ class SurveyDetailSerializer(SurveySerializer):
         return survey
         
     def update(self, instance, validated_data):
-        questions_data = validated_data.pop('questions', [])
+        """
+        Update a survey and its related questions.
+        This method handles several complex scenarios:
+        1. Updates survey fields
+        2. Updates, creates, or deletes questions based on the provided data
+        3. Preserves answers when deleting questions that have answers
+        """
+        from django.db import transaction
+
+        # Extract questions data before updating main survey
+        questions_data = validated_data.pop('questions', None)
+        
+        # First update the survey fields
         survey = super().update(instance, validated_data)
         
-        # Handle existing questions
-        if questions_data:
-            # Remove existing questions and create new ones
-            instance.questions.all().delete()
+        # IMPORTANT: If questions_data is None (not provided), don't modify existing questions
+        # This is to prevent accidental deletion of all questions
+        if questions_data is None:
+            logger.info(f"Survey {survey.id} update: No questions data provided, keeping existing questions")
+            return survey
             
+        logger.info(f"Survey {survey.id} update: Processing {len(questions_data)} questions")
+        
+        # Get existing questions
+        existing_questions = list(instance.questions.all().order_by('order'))
+        
+        # Store IDs as integers for consistent comparison
+        # Create a mapping of existing question objects by their ID for direct access
+        existing_question_ids = set()
+        existing_questions_by_id = {}
+        for q in existing_questions:
+            if q.id is not None:
+                q_id = int(q.id)
+                existing_question_ids.add(q_id)
+                existing_questions_by_id[q_id] = q
+        
+        existing_question_count = len(existing_questions)
+        
+        logger.info(f"Survey {survey.id} update: Found {existing_question_count} existing questions with IDs: {existing_question_ids}")
+        
+        # Check if the incoming question data contains any IDs at all
+        any_questions_have_ids = False
+        for q_data in questions_data:
+            if 'id' in q_data and q_data['id'] is not None:
+                any_questions_have_ids = True
+                break
+                
+        logger.info(f"Survey {survey.id} update: Incoming questions have IDs: {any_questions_have_ids}")
+        
+        # Process the incoming question data for better debugging
+        incoming_questions_info = []
+        for i, q_data in enumerate(questions_data):
+            q_id = q_data.get('id')
+            q_id_str = str(q_id) if q_id is not None else 'NEW'
+            q_type = q_data.get('type', 'unknown')
+            incoming_questions_info.append(f"Q{i+1}: ID={q_id_str}, Type={q_type}")
+        
+        logger.info(f"Survey {survey.id} update: Incoming questions: {', '.join(incoming_questions_info)}")
+        
+        # Check which questions have answers
+        questions_with_answers = set(
+            Answer.objects.filter(question__in=existing_questions)
+            .values_list('question_id', flat=True)
+            .distinct()
+        )
+        
+        logger.info(f"Survey {survey.id} update: Questions with answers: {questions_with_answers}")
+        
+        # We'll use a transaction to ensure all changes happen together or not at all
+        with transaction.atomic():
+            # If it's an exact replacement of all questions (same count, no IDs provided)
+            # OR if no questions have IDs at all, use in-place updating to preserve IDs
+            if (len(questions_data) == existing_question_count and 
+                (not any_questions_have_ids or not any('id' in q and q['id'] is not None for q in questions_data))):
+                
+                logger.info(f"Survey {survey.id} update: Using in-place update strategy (count: {existing_question_count}, no IDs sent)")
+                
+                # Update existing questions in place based on order
+                for i, (question, question_data) in enumerate(zip(existing_questions, questions_data)):
+                    # Remove order from data as we're setting it explicitly
+                    question_data.pop('order', None)
+                    # Remove ID if present to avoid conflicts
+                    question_data.pop('id', None)
+                    # Update fields
+                    for attr, value in question_data.items():
+                        setattr(question, attr, value)
+                    # Ensure order is maintained
+                    question.order = i + 1
+                    question.save()
+                    logger.info(f"Survey {survey.id} update: Updated question {question.id} in-place at position {i+1}")
+                
+                # If we have more questions in the incoming data than existing ones, create new ones
+                if len(questions_data) > existing_question_count:
+                    for i, question_data in enumerate(questions_data[existing_question_count:], existing_question_count + 1):
+                        question_data.pop('order', None)
+                        question_data.pop('id', None)  # Remove ID if present
+                        new_question = Question.objects.create(survey=survey, order=i, **question_data)
+                        logger.info(f"Survey {survey.id} update: Created new question ID {new_question.id} at position {i}")
+                
+                return survey
+            
+            # If we get here, at least some questions have IDs, so we'll use the standard update/create/delete logic
+            logger.info(f"Survey {survey.id} update: Using standard update logic (some questions have IDs)")
+            
+            # Track which question IDs are in the updated data
+            updated_question_ids = set()
+            
+            # First pass: Update existing questions or create new ones
             for order, question_data in enumerate(questions_data, 1):
-                # Remove order from question_data if it exists since we're setting it explicitly
-                question_data.pop('order', None)
-                Question.objects.create(survey=survey, order=order, **question_data)
+                question_id = question_data.pop('id', None)
+                question_data.pop('order', None)  # We'll set order explicitly
+                
+                # Convert ID to integer for comparison if it's not None
+                original_id = question_id  # Keep original for logging
+                if question_id is not None:
+                    try:
+                        question_id = int(question_id)
+                    except (ValueError, TypeError):
+                        # If conversion fails, treat as a new question
+                        logger.warning(f"Survey {survey.id} update: Could not convert question ID {original_id} to integer, treating as new question")
+                        question_id = None
+                
+                # Debug logging for each question processed
+                logger.info(f"Survey {survey.id} update: Processing question at position {order} with ID {question_id} (original: {original_id})")
+                
+                if question_id is not None and question_id in existing_question_ids:
+                    # Update existing question directly from our mapping
+                    question = existing_questions_by_id[question_id]
+                    for attr, value in question_data.items():
+                        setattr(question, attr, value)
+                    question.order = order
+                    question.save()
+                    updated_question_ids.add(question_id)
+                    logger.info(f"Survey {survey.id} update: Updated existing question ID {question_id}")
+                else:
+                    # Create new question
+                    new_question = Question.objects.create(survey=survey, order=order, **question_data)
+                    logger.info(f"Survey {survey.id} update: Created new question ID {new_question.id}")
+            
+            # Calculate which questions were NOT included in the update (for deletion)
+            questions_to_delete = existing_question_ids - updated_question_ids
+            
+            # Debug logging for deletion
+            logger.info(f"Survey {survey.id} update: Questions marked for deletion: {questions_to_delete}")
+            
+            if questions_to_delete:
+                # Check if we need to handle questions with answers
+                questions_to_delete_with_answers = questions_to_delete.intersection(questions_with_answers)
+                questions_to_delete_without_answers = questions_to_delete - questions_with_answers
+                
+                # Log what we're doing for debugging
+                logger.info(f"Survey {survey.id} update: Deleting questions without answers: {questions_to_delete_without_answers}")
+                logger.info(f"Survey {survey.id} update: Handling questions with answers: {questions_to_delete_with_answers}")
+                
+                # Delete questions without answers normally
+                if questions_to_delete_without_answers:
+                    deleted_count = Question.objects.filter(id__in=questions_to_delete_without_answers).delete()[0]
+                    logger.info(f"Survey {survey.id} update: Deleted {deleted_count} questions without answers")
+                
+                # Special handling for questions with answers: remove the question_id reference from answers
+                if questions_to_delete_with_answers:
+                    # For each question with answers that needs to be deleted:
+                    # 1. Find all answers for this question
+                    # 2. Set question_id to NULL for affected answers to preserve the answer data
+                    # 3. Then delete the question
+                    for question_id in questions_to_delete_with_answers:
+                        # Get the answers for this question
+                        answers = Answer.objects.filter(question_id=question_id)
+                        answer_count = answers.count()
+                        
+                        # Set question_id to NULL for affected answers to preserve the answer data
+                        # Our model has on_delete=SET_NULL and null=True
+                        update_count = Answer.objects.filter(question_id=question_id).update(question=None)
+                        
+                        # Now we can safely delete the question
+                        delete_count = Question.objects.filter(id=question_id).delete()[0]
+                        
+                        # Log the operation
+                        logger.info(f"Survey {survey.id} update: Preserved {update_count}/{answer_count} answers while deleting question {question_id} (deleted: {delete_count})")
                 
         return survey
 
@@ -462,6 +797,36 @@ class TemplateDetailSerializer(TemplateSerializer):
                 ret['clusters'] = CustomWordCluster.objects.filter(id__in=cluster_ids)
         
         return ret
+
+    def create(self, validated_data):
+        # Extract nested data
+        clusters_data = validated_data.pop('clusters', None)
+        questions_data = validated_data.pop('questions', [])
+        
+        # Create the template instance
+        template = super().create(validated_data)
+        
+        # Set clusters if provided
+        if clusters_data is not None:
+            template.clusters.set(clusters_data)
+            
+        # Create questions if provided
+        if questions_data:
+            for question_data in questions_data:
+                # Ensure we have required fields
+                if not isinstance(question_data, dict):
+                    continue
+                    
+                if 'order' not in question_data:
+                    question_data['order'] = 1
+                if 'type' not in question_data:
+                    question_data['type'] = 'free_text'
+                if 'questions' not in question_data:
+                    question_data['questions'] = {}
+                
+                TemplateQuestion.objects.create(template=template, **question_data)
+        
+        return template
 
     def update(self, instance, validated_data):
         # Handle clusters (ManyToMany relationship)

@@ -1,0 +1,4 @@
+--- a/frontend/src/app/dashboard/surveys/[id]/stats/SurveyStatsClient.tsx
++++ b/frontend/src/app/dashboard/surveys/[id]/stats/SurveyStatsClient.tsx
+@@ -619,11 +619,11 @@
+                                       <Accordion type="single" collapsible className="w-full">

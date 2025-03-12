@@ -79,7 +79,12 @@
       "daily": "Respuestas Diarias",
       "devices": "Uso de Dispositivos",
       "locations": "Ubicaciones de Respuestas"
-    }
+    },
+    "sentenceAnalysis": "Análisis de Oraciones",
+    "positive": "Positivo",
+    "negative": "Negativo",
+    "neutral": "Neutral",
+    "sentiment": "Sentimiento"
   },
   "analysis": {
     "title": "Análisis de Respuestas",

@@ -79,7 +79,12 @@
       "daily": "Daily Responses",
       "devices": "Device Usage",
       "locations": "Response Locations"
-    }
+    },
+    "sentenceAnalysis": "Sentence Analysis",
+    "positive": "Positive",
+    "negative": "Negative",
+    "neutral": "Neutral",
+    "sentiment": "Sentiment"
   },
   "analysis": {
     "title": "Response Analysis",
@@ -87,6 +92,7 @@
     "overview": "Response Overview",
     "sentiment": "Sentiment Analysis",
     "word_cloud": "Word Cloud",
+    "cluster_cloud": "Custom Clusters Cloud",
     "key_topics": "Key Topics",
     "explore": "Explore Responses"
   },
@@ -105,6 +111,10 @@
     "textPlaceholder": "Enter question in {{language}}",
     "placeholderWithLanguage": "Placeholder - {{language}}",
     "placeholderInputText": "Enter placeholder in {{language}}",
+    "deleteWarningTitle": "Delete Question with Answers",
+    "deleteWarningDescription": "This question has answers from survey responses. Deleting it will preserve the answer data but break the connection to this question. This may impact your survey analysis. Are you sure you want to proceed?",
+    "deleteWarningCancel": "Cancel",
+    "deleteWarningConfirm": "Yes, Delete Question",
     "types": {
       "text": "Free Text",
       "single_choice": "Single Choice",
@@ -182,7 +192,14 @@
       "expiredTitleWithLanguage": "Expired Title - {{language}}",
       "expiredMessage": "Expired Message",
       "expiredMessageWithLanguage": "Expired Message - {{language}}",
-      "analysisCluster": "Analysis Cluster"
+      "analysisCluster": "Analysis Cluster",
+      "template": "Template",
+      "start_survey_titles": "Start Survey Titles",
+      "start_survey_texts": "Start Survey Messages",
+      "end_survey_titles": "End Survey Titles",
+      "end_survey_texts": "End Survey Messages",
+      "expired_survey_titles": "Expired Survey Titles",
+      "expired_survey_texts": "Expired Survey Messages"
     },
     "placeholders": {
       "title": "Enter title",
@@ -217,6 +234,13 @@
       "tokenFormat": "Token can only contain lowercase letters, numbers, and hyphens",
       "duplicateToken": "Token already exists",
       "qrCodesAvailable": "QR codes are available for each token after saving the survey."
+    },
+    "errors": {
+      "fieldRequired": "{{field}} is required",
+      "tokensValidation": "Survey tokens have validation errors",
+      "tokenFieldRequired": "Token {{index}}: {{field}} is required",
+      "requiredLanguageField": "{{field}} is required for language {{language}}",
+      "templateRequired": "Template is required"
     },
     "buttons": {
       "save": "Save",

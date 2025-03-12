@@ -56,6 +56,11 @@ interface Response {
     nps_rating?: number;
     text_answer?: string;
     sentiment_score?: number;
+    sentence_sentiments?: Array<{
+      text: string;
+      sentiment: number;
+      index?: number;
+    }>;
   }>;
 }
 
@@ -590,6 +595,52 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
                               ) : (
                                 <div>
                                   {matchingAnswer.text_answer || <span className="text-muted-foreground">-</span>}
+                                  {/* {matchingAnswer.sentiment_score !== undefined && (
+                                    <div className="mt-1">
+                                      <Badge variant="outline" className={
+                                        matchingAnswer.sentiment_score > 0.3 ? "text-green-500 border-green-200" :
+                                        matchingAnswer.sentiment_score < -0.3 ? "text-red-500 border-red-200" :
+                                        "text-yellow-500 border-yellow-200"
+                                      }>
+                                        Sentiment: {
+                                          matchingAnswer.sentiment_score > 0.3 ? "Positive" :
+                                          matchingAnswer.sentiment_score < -0.3 ? "Negative" :
+                                          "Neutral"
+                                        }
+                                      </Badge>
+                                    </div>
+                                  )} */}
+                                  
+                                  {/* Display sentence-level sentiments if available */}
+                                  {matchingAnswer.sentence_sentiments && matchingAnswer.sentence_sentiments.length > 0 && (
+                                    <div className="mt-2">
+                                      <Accordion type="single" collapsible className="w-full">
+                                        <AccordionItem value="sentence-analysis" className="border-0">
+                                          <AccordionTrigger className="py-1 px-0 text-sm font-medium">
+                                            {t('stats.sentenceAnalysis')} ({matchingAnswer.sentence_sentiments?.length || 0})
+                                          </AccordionTrigger>
+                                          <AccordionContent className="pt-2 pb-0">
+                                            <div className="space-y-2">
+                                              {matchingAnswer.sentence_sentiments?.map((sentence, idx) => (
+                                                <div key={idx} className="pl-2 border-l-2 border-gray-200 mt-1">
+                                                  <p className="text-sm">{sentence.text}</p>
+                                                  <Badge variant="outline" className={
+                                                    sentence.sentiment > 0.3 ? "text-green-500 border-green-200" :
+                                                    sentence.sentiment < -0.3 ? "text-red-500 border-red-200" :
+                                                    "text-yellow-500 border-yellow-200"
+                                                  }>
+                                                    {sentence.sentiment > 0.3 ? t('stats.positive') :
+                                                     sentence.sentiment < -0.3 ? t('stats.negative') :
+                                                     t('stats.neutral')} ({sentence.sentiment.toFixed(2)})
+                                                  </Badge>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </AccordionContent>
+                                        </AccordionItem>
+                                      </Accordion>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </TableCell>
@@ -678,7 +729,7 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
                                       ) : (
                                         <div>
                                           {answer.text_answer !== undefined ? answer.text_answer : <span className="text-muted-foreground">No answer</span>}
-                                          {answer.sentiment_score !== undefined && (
+                                          {/* {answer.sentiment_score !== undefined && (
                                             <div className="mt-1">
                                               <Badge variant="outline" className={
                                                 answer.sentiment_score > 0.3 ? "text-green-500 border-green-200" :
@@ -691,6 +742,37 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
                                                   "Neutral"
                                                 }
                                               </Badge>
+                                            </div>
+                                          )} */}
+                                          
+                                          {/* Display sentence-level sentiments if available */}
+                                          {answer.sentence_sentiments && answer.sentence_sentiments.length > 0 && (
+                                            <div className="mt-2">
+                                              <Accordion type="single" collapsible className="w-full">
+                                                <AccordionItem value="sentence-analysis" className="border-0">
+                                                  <AccordionTrigger className="py-1 px-0 text-sm font-medium">
+                                                    {t('stats.sentenceAnalysis')} ({answer.sentence_sentiments?.length || 0})
+                                                  </AccordionTrigger>
+                                                  <AccordionContent className="pt-2 pb-0">
+                                                    <div className="space-y-2">
+                                                      {answer.sentence_sentiments?.map((sentence, idx) => (
+                                                        <div key={idx} className="pl-2 border-l-2 border-gray-200 mt-1">
+                                                          <p className="text-sm">{sentence.text}</p>
+                                                          <Badge variant="outline" className={
+                                                            sentence.sentiment > 0.3 ? "text-green-500 border-green-200" :
+                                                            sentence.sentiment < -0.3 ? "text-red-500 border-red-200" :
+                                                            "text-yellow-500 border-yellow-200"
+                                                          }>
+                                                            {sentence.sentiment > 0.3 ? t('stats.positive') :
+                                                             sentence.sentiment < -0.3 ? t('stats.negative') :
+                                                             t('stats.neutral')} ({sentence.sentiment.toFixed(2)})
+                                                          </Badge>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  </AccordionContent>
+                                                </AccordionItem>
+                                              </Accordion>
                                             </div>
                                           )}
                                         </div>

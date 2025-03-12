@@ -3,11 +3,12 @@
 import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import Image from 'next/image';
-import { Clock } from 'lucide-react';
+import { Clock, Calendar } from 'lucide-react';
 
 export default function ThankYouPage() {
   const [surveyTitle, setSurveyTitle] = useState<string>('');
   const [isExpired, setIsExpired] = useState<boolean>(false);
+  const [notStarted, setNotStarted] = useState<boolean>(false);
   const [pageTitle, setPageTitle] = useState<string>('Thank You for Your Feedback!');
   const [pageMessage, setPageMessage] = useState<string>('Your participation helps us improve our workshops and create better experiences for future attendees.');
   
@@ -20,15 +21,31 @@ export default function ThankYouPage() {
     // Check if we have survey information in sessionStorage
     const title = sessionStorage.getItem('surveyTitle');
     const expired = sessionStorage.getItem('surveyExpired') === 'true';
+    const notStartedYet = sessionStorage.getItem('surveyNotStarted') === 'true';
     
     if (title) {
       setSurveyTitle(title);
     }
     
     setIsExpired(expired);
+    setNotStarted(notStartedYet);
     
-    // Set title and message based on expiration status
-    if (expired) {
+    // Set title and message based on status
+    if (notStartedYet) {
+      // Survey has not started yet
+      const startTitle = sessionStorage.getItem('startSurveyTitle');
+      const startMessage = sessionStorage.getItem('startSurveyMessage');
+      
+      console.log("Start title from storage:", startTitle);
+      console.log("Start message from storage:", startMessage);
+      
+      if (startTitle) setPageTitle(startTitle);
+      else setPageTitle('Survey Not Started Yet');
+      
+      if (startMessage) setPageMessage(startMessage);
+      else setPageMessage('This survey is not accepting responses yet. Please check back later.');
+    } else if (expired) {
+      // Survey has expired
       const expiredTitle = sessionStorage.getItem('expiredSurveyTitle');
       const expiredMessage = sessionStorage.getItem('expiredSurveyMessage');
       
@@ -41,6 +58,7 @@ export default function ThankYouPage() {
       if (expiredMessage) setPageMessage(expiredMessage);
       else setPageMessage('This survey is no longer accepting responses because it has reached its expiration date.');
     } else {
+      // Normal thank you page
       const endTitle = sessionStorage.getItem('endSurveyTitle');
       const endMessage = sessionStorage.getItem('endSurveyMessage');
       
@@ -57,10 +75,13 @@ export default function ThankYouPage() {
       sessionStorage.removeItem('surveyTitle');
       sessionStorage.removeItem('surveyLanguage');
       sessionStorage.removeItem('surveyExpired');
+      sessionStorage.removeItem('surveyNotStarted');
       sessionStorage.removeItem('endSurveyTitle');
       sessionStorage.removeItem('endSurveyMessage');
       sessionStorage.removeItem('expiredSurveyTitle');
       sessionStorage.removeItem('expiredSurveyMessage');
+      sessionStorage.removeItem('startSurveyTitle');
+      sessionStorage.removeItem('startSurveyMessage');
     }, 1000); // Small delay to ensure we don't clear before using
   }, []);
   
@@ -87,6 +108,10 @@ export default function ThankYouPage() {
             {isExpired ? (
               <div className="text-[#FF9800] text-6xl">
                 <Clock size={64} />
+              </div>
+            ) : notStarted ? (
+              <div className="text-[#3B82F6] text-6xl">
+                <Calendar size={64} />
               </div>
             ) : (
               <div className="text-[#4CAF50] text-6xl">✓</div>

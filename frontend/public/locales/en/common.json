@@ -9,7 +9,8 @@
     "analytics": "Analytics",
     "users": "Users",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "templates": "Templates"
   },
   "languages": {
     "en": "English",

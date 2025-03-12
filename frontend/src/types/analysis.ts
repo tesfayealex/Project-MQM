@@ -68,7 +68,19 @@ export interface WordCloudItem {
     text: string;
     value: number;
     sentiment: number;
+    word?: string;
+    frequency?: number;
+    sentiment_score?: number;
+    name?: string;
     is_positive?: boolean;
     is_negative?: boolean;
     is_neutral?: boolean;
+    sentence_text?: string | null;
+    sentence_index?: number | null;
+    sentence_texts?: string[];
+    sentence_indices?: number[];
+    sentence_sentiments?: number[];
+    nps_score?: number | null;
+    sentences?: string[];
+    keywords?: string[];
 } 
