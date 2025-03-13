@@ -433,6 +433,24 @@ export default function SurveyDetail({ params }: { params: { id: string } | { va
             </div>
           </div>
 
+          {/* Template Information */}
+          {survey?.template_detail && (
+            <div className="mt-4">
+              <h3 className="text-lg font-semibold mb-2">Template</h3>
+              <div className="flex items-center">
+                <p className="text-gray-600">{survey.template_detail.title || 'Unknown template'}</p>
+                {survey.template_detail.id && (
+                  <Link 
+                    href={`/dashboard/templates/${survey.template_detail.id}`}
+                    className="ml-2 text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    View Template
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4">
             <h3 className="text-lg font-semibold mb-2">Survey Dates</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

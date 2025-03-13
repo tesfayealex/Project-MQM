@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeftIcon, ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline';
-import { Loader2, BarChart2, ArrowDownIcon, ArrowUpIcon, ListFilter, CheckIcon, EditIcon } from 'lucide-react';
-import { getSurvey, getSurveyStats, getSurveyResponses, getSurveyResponseWords, updateWordCluster } from '@/lib/services/survey-service';
+import { Loader2, BarChart2, ArrowDownIcon, ArrowUpIcon, ListFilter, CheckIcon, EditIcon, Download } from 'lucide-react';
+import { getSurvey, getSurveyStats, getSurveyResponses, getSurveyResponseWords, updateWordCluster, exportSurveyResponses, exportSurveyClusters, testExportEndpoint } from '@/lib/services/survey-service';
 import { processSurveyResponses } from '@/lib/services/cluster-service';
 import { getActiveClusters } from '@/lib/services/cluster-service';
 import { Survey, SurveyStats } from '@/types/survey';
@@ -78,7 +78,7 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
   const surveyId = propsSurveyId || (params?.id as string);
   
   const [survey, setSurvey] = useState<Survey | null>(null);
-  const [stats, setStats] = useState<any | null>(null);
+  const [stats, setStats] = useState<SurveyStats | null>(null);
   const [responses, setResponses] = useState<Response[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +89,11 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
   const [availableClusters, setAvailableClusters] = useState<string[]>([]);
   const [editingWordId, setEditingWordId] = useState<number | null>(null);
   const [updatingCluster, setUpdatingCluster] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportingClusters, setExportingClusters] = useState(false);
+  const [expandedResponseId, setExpandedResponseId] = useState<string | null>(null);
+  const [responseWords, setResponseWords] = useState<Record<string, any[]>>({});
+  const [clusters, setClusters] = useState<any[]>([]);
   
   useEffect(() => {
     async function fetchSurveyAndStats() {
@@ -227,25 +232,35 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
   // Add a function to handle processing all responses
   async function handleProcessAllResponses() {
     if (!surveyId) return;
-
+    
     try {
       setProcessing(true);
       const result = await processSurveyResponses(surveyId);
+      
+      // Show success message
       toast({
-        title: "Processing Complete",
-        description: result.message || `Processed survey responses successfully.`,
+        title: "Success",
+        description: result.message || "Responses processed successfully",
       });
-      // Refresh the responses after processing
+      
+      // Reload responses to show updated data
       if (surveyId) {
         const newResponses = await getSurveyResponses(surveyId);
         setResponses(newResponses);
       }
+      
     } catch (error: any) {
+      console.error('Error processing responses:', error);
+      
       toast({
-        title: "Processing Failed",
-        description: error.message || "Failed to process survey responses",
-        variant: "destructive"
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to process responses",
       });
+      
+      // Handle authentication errors
+      handleAuthError(error);
+      
     } finally {
       setProcessing(false);
     }
@@ -279,6 +294,55 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
     if (value && viewMode === "enhanced") {
       const responseId = value.replace('item-', '');
       loadExtractedWords(responseId);
+    }
+  };
+
+  const handleExportResponses = async () => {
+    setExporting(true);
+    try {
+      console.log(`Exporting responses for survey ID: ${surveyId} at ${new Date().toISOString()}`);
+      const result = await exportSurveyResponses(surveyId);
+      console.log(`Export result:`, result);
+      toast({
+        title: "Export Successful",
+        description: "Responses have been exported to Excel.",
+      });
+    } catch (error) {
+      console.error(`Export failed for survey ID: ${surveyId} at ${new Date().toISOString()}`, error);
+      toast({
+        title: "Export Failed",
+        description: `There was an error exporting the responses: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+      
+      // Show more detailed error in console for debugging
+      if (error instanceof Error) {
+        console.error(`Export error details: ${error.stack || error.message}`);
+      }
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportClusters = async () => {
+    setExportingClusters(true);
+    try {
+      console.log(`Exporting clusters for survey ID: ${surveyId} at ${new Date().toISOString()}`);
+      const result = await exportSurveyClusters(surveyId);
+      console.log(`Clusters export result:`, result);
+      toast({
+        title: "Export Successful",
+        description: "Clusters have been exported to Excel.",
+      });
+    } catch (error) {
+      console.error(`Clusters export failed for survey ID: ${surveyId} at ${new Date().toISOString()}`, error);
+      toast({
+        title: "Export Failed",
+        description: `There was an error exporting the clusters: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        variant: "destructive",
+      });
+    } finally {
+      setExportingClusters(false);
     }
   };
 
@@ -500,32 +564,91 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
                 </Button>
               </div>
             </div>
-            <Tooltip delayDuration={300}>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="ml-auto h-8 lg:flex"
-                  onClick={handleProcessAllResponses}
-                  disabled={processing || !surveyId}
-                >
-                  {processing ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <BarChart2 className="mr-2 h-4 w-4" />
-                      Process All Responses
-                    </>
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Process all responses to assign words to clusters</p>
-              </TooltipContent>
-            </Tooltip>
+            <div className="flex items-center space-x-2">
+              {/* Export to Excel button */}
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 lg:flex"
+                    onClick={handleExportResponses}
+                    disabled={exporting || !surveyId || responses.length === 0}
+                  >
+                    {exporting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Exporting...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export to Excel
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Download all responses as an Excel file</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Replace test button with Export Clusters button */}
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button 
+                    onClick={handleExportClusters} 
+                    variant="outline"
+                    size="sm"
+                    className="h-8 lg:flex"
+                    disabled={exportingClusters || !surveyId || responses.length === 0}
+                  >
+                    {exportingClusters ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Exporting...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export Clusters
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Download cluster analysis as an Excel file</p>
+                </TooltipContent>
+              </Tooltip>
+
+              {/* Process All Responses button */}
+              <Tooltip delayDuration={300}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 lg:flex"
+                    onClick={handleProcessAllResponses}
+                    disabled={processing || !surveyId}
+                  >
+                    {processing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <BarChart2 className="mr-2 h-4 w-4" />
+                        Process All Responses
+                      </>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Process all responses to assign words to clusters</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
           </div>
           
           {responses.length === 0 ? (
@@ -895,4 +1018,6 @@ export function SurveyStatsClient({ surveyId: propsSurveyId }: SurveyStatsClient
       </Tabs>
     </div>
   );
-} 
+}
+
+// ...existing code...

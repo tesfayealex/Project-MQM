@@ -36,143 +36,111 @@ def direct_process_response(response_id):
             
             # 1. Analyze text at sentence level for sentiment
             sentence_data = analyze_sentences_with_openai(answer.text_answer, language)
-            answer.sentence_sentiments = sentence_data
-            
-            # Initialize variables for word processing
-            all_processed_words = []
-            words_to_sentences = {}
-            
-            # 2. Process each sentence to extract words
-            for sentence_info in sentence_data:
-                sentence_text = sentence_info['text']
-                sentence_idx = sentence_info['index']
-                sentence_sentiment = sentence_info['sentiment']
+            if len(sentence_data) > 0:
+                answer.sentence_sentiments = sentence_data
                 
-                # Extract words from this sentence
-                sentence_words = process_sentence(sentence_text, language)
+                # Initialize variables for word processing
+                all_processed_words = []
+                words_to_sentences = {}
                 
-                # Map each word to its source sentence and sentiment
-                for word in sentence_words:
-                    words_to_sentences[word] = {
-                        'text': sentence_text,
-                        'index': sentence_idx,
-                        'sentiment': sentence_sentiment
-                    }
+                # 2. Process each sentence to extract words
+                for sentence_info in sentence_data:
+                    sentence_text = sentence_info['text']
+                    sentence_idx = sentence_info['index']
+                    sentence_sentiment = sentence_info['sentiment']
+                    
+                    # Extract words from this sentence
+                    sentence_words = process_sentence(sentence_text, language)
+                    
+                    # Map each word to its source sentence and sentiment
+                    for word in sentence_words:
+                        words_to_sentences[word] = {
+                            'text': sentence_text,
+                            'index': sentence_idx,
+                            'sentiment': sentence_sentiment
+                        }
+                    
+                    # Add to our complete list of processed words
+                    all_processed_words.extend(sentence_words)
                 
-                # Add to our complete list of processed words
-                all_processed_words.extend(sentence_words)
-            
-            # 3. Assign clusters to words using the utility function
-            word_clusters = assign_clusters_to_words(answer.text_answer, all_processed_words, language, survey)
-            
-            # 4. Create ResponseWord instances for each processed word
-            for word in all_processed_words:
-                # Get sentence data for this word
-                sentence_data = words_to_sentences.get(word, {})
-                sentence_text = sentence_data.get('text', '')
-                sentence_idx = sentence_data.get('index', None)
-                sentiment_score = sentence_data.get('sentiment', 0)
+                # 3. Assign clusters to words using the utility function
+                word_clusters = assign_clusters_to_words(answer.text_answer, all_processed_words, language, survey)
                 
-                # Get assigned cluster from word_clusters dictionary
-                assigned_cluster = word_clusters.get(word, 'Other')
-                
-                # Create the ResponseWord instance
-                response_word = ResponseWord.objects.create(
-                    response=response,
-                    answer=answer,
-                    word=word,
-                    original_text=answer.text_answer,
-                    language=language,
-                    sentence_text=sentence_text,
-                    sentence_index=sentence_idx,
-                    sentiment_score=sentiment_score,  # Use sentence-level sentiment for the word
-                    assigned_cluster=assigned_cluster
-                )
-                
-                # Find and associate with the matching custom cluster
-                if assigned_cluster != 'Other':
-                    try:
-                        # Check if this cluster already exists, if not create it
-                        cluster_obj, created = CustomWordCluster.objects.get_or_create(
-                            name=assigned_cluster,
-                            defaults={
-                                'created_by': survey.created_by,
-                                'is_active': True,
-                                'description': f'Auto-created cluster from survey {survey.description}'
-                            }
-                        )
-                        
-                        response_word.custom_clusters.add(cluster_obj)
-                        
-                        # Update the last_processed timestamp for the cluster
-                        cluster_obj.last_processed = timezone.now()
-                        cluster_obj.save(update_fields=['last_processed'])
-                        
-                        # Update the word count
-                        cluster_obj.update_word_count()
-                        
-                        # Create or update word clusters based on the sentiment of the sentence
-                        is_positive = sentiment_score > 0.05
-                        is_negative = sentiment_score < -0.05
-                        is_neutral = not (is_positive or is_negative)
-                        
-                        category = 'positive' if is_positive else 'negative' if is_negative else 'neutral'
-                        
-                        # Get or create the word cluster for this survey
-                        word_cluster, created = WordCluster.objects.get_or_create(
-                            survey=survey,
-                            name=assigned_cluster,
-                            defaults={
-                                'description': f'Cluster for "{assigned_cluster}" words',
-                                'sentiment_score': sentiment_score,
-                                'frequency': 1,
-                                'is_positive': is_positive,
-                                'is_negative': is_negative,
-                                'is_neutral': is_neutral,
-                                'category': category,
-                                'custom_cluster_id': cluster_obj.id
-                            }
-                        )
-                        
-                        if not created:
-                            # Update frequency and recalculate sentiment
-                            word_cluster.frequency += 1
+                # 4. Create ResponseWord instances for each processed word
+                for word in all_processed_words:
+                    # Get sentence data for this word
+                    sentence_data = words_to_sentences.get(word, {})
+                    sentence_text = sentence_data.get('text', '')
+                    sentence_idx = sentence_data.get('index', None)
+                    sentiment_score = sentence_data.get('sentiment', 0)
+                    
+                    # Get assigned cluster from word_clusters dictionary
+                    assigned_cluster = word_clusters.get(word, 'Other')
+                    
+                    # Create the ResponseWord instance
+                    response_word = ResponseWord.objects.create(
+                        response=response,
+                        answer=answer,
+                        word=word,
+                        original_text=answer.text_answer,
+                        language=language,
+                        sentence_text=sentence_text,
+                        sentence_index=sentence_idx,
+                        sentiment_score=sentiment_score,  # Use sentence-level sentiment for the word
+                        assigned_cluster=assigned_cluster
+                    )
+                    
+                    # Find and associate with the matching custom cluster
+                    if assigned_cluster != 'Other':
+                        try:
+                            # Check if this cluster already exists, if not create it
+                            cluster_obj, created = CustomWordCluster.objects.get_or_create(
+                                name=assigned_cluster,
+                                defaults={
+                                    'created_by': survey.created_by,
+                                    'is_active': True,
+                                    'description': f'Auto-created cluster from survey {survey.description}'
+                                }
+                            )
                             
-                            # Update cumulative sentiment score
-                            current_total = word_cluster.sentiment_score * (word_cluster.frequency - 1)
-                            new_total = current_total + sentiment_score
-                            word_cluster.sentiment_score = new_total / word_cluster.frequency
+                            response_word.custom_clusters.add(cluster_obj)
                             
-                            # Update sentiment categories
-                            if word_cluster.sentiment_score > 0.05:
-                                word_cluster.is_positive = True
-                                word_cluster.is_negative = False
-                                word_cluster.is_neutral = False
-                                word_cluster.category = 'positive'
-                            elif word_cluster.sentiment_score < -0.05:
-                                word_cluster.is_positive = False
-                                word_cluster.is_negative = True
-                                word_cluster.is_neutral = False
-                                word_cluster.category = 'negative'
-                            else:
-                                word_cluster.is_positive = False
-                                word_cluster.is_negative = False
-                                word_cluster.is_neutral = True
-                                word_cluster.category = 'neutral'
+                            # Update the last_processed timestamp for the cluster
+                            cluster_obj.last_processed = timezone.now()
+                            cluster_obj.save(update_fields=['last_processed'])
                             
-                            word_cluster.save()
-                        
-                        # Associate word with the cluster
-                        response_word.clusters.add(word_cluster)
-                        
-                    except Exception as e:
-                        logger.error(f"Error associating word with cluster: {str(e)}")
-            
-            # 5. Mark answer as processed
-            answer.processed = True
-            answer.save(update_fields=['processed', 'sentence_sentiments'])
-            
-            logger.info(f"Successfully processed answer {answer.id} with {len(all_processed_words)} words")
+                            # Update the word count
+                            cluster_obj.update_word_count()
+                            
+                            # Create or update word clusters based on the sentiment of the sentence
+                            is_positive = sentiment_score > 0.05
+                            is_negative = sentiment_score < -0.05
+                            is_neutral = not (is_positive or is_negative)
+                            
+                            category = 'positive' if is_positive else 'negative' if is_negative else 'neutral'
+                            
+                            # We no longer create WordCluster objects - just use CustomWordCluster directly
+                            # The SurveyAnalysisViewSet._generate_word_clusters method will handle 
+                            # calculating metrics from CustomWordCluster assignments
+                            
+                            # Associate the response word with the custom cluster
+                            response_word.custom_clusters.add(cluster_obj)
+                            
+                            # Log the assignment
+                            print(f"  Word '{word}' assigned to cluster '{assigned_cluster}' ({category})")
+                            
+                            # Increment metrics for this cluster
+                            
+                        except Exception as e:
+                            logger.error(f"Error associating word with cluster: {str(e)}")
+                
+                # 5. Mark answer as processed
+                answer.processed = True
+                answer.save(update_fields=['processed', 'sentence_sentiments'])
+                
+                logger.info(f"Successfully processed answer {answer.id} with {len(all_processed_words)} words")
+            else:
+                logger.info(f"No sentence data found for answer {answer.id}")
         
         return True
         
@@ -201,6 +169,7 @@ def direct_process_all_responses(survey_id):
         # Process responses with unprocessed text answers
         responses_to_process = []
         for response in responses:
+
             if response.answers.filter(text_answer__isnull=False, processed=False).exists():
                 responses_to_process.append(response.id)
         
@@ -214,17 +183,42 @@ def direct_process_all_responses(survey_id):
         
         logger.info(f"Successfully processed {processed_count} responses for survey {survey_id}")
         
-        # Update the survey analysis summary
+        # Update the survey analysis summary using _generate_word_clusters which now calculates all metrics
         from .views import SurveyAnalysisViewSet
         analysis_view = SurveyAnalysisViewSet()
-        summary = analysis_view._update_analysis_summary(survey.analysis_summary)
+        analysis_view._generate_word_clusters(survey)
         
         logger.info(f"Updated analysis summary for survey {survey_id}")
+        
+        # Find the most frequent clusters to include in the response
+        from .models import CustomWordCluster
+        from django.db.models import Count
+        
+        top_clusters = CustomWordCluster.objects.filter(
+            words__response__survey=survey
+        ).annotate(
+            response_frequencies=Count('words__response', distinct=True),
+            avg_nps=Avg('words__response__answers__nps_rating', 
+                       filter=Q(words__response__answers__question__type='nps'))
+        ).order_by('-response_frequencies')[:5]
+        
+        # Format clusters for response
+        clusters_data = [
+            {
+                'id': cluster.id,
+                'name': cluster.name,
+                'response_frequencies': cluster.response_frequencies,
+                'avg_nps': round(cluster.avg_nps, 1) if cluster.avg_nps is not None else None
+            }
+            for cluster in top_clusters
+        ]
         
         return {
             'success': True,
             'processed_count': processed_count,
-            'total_responses': responses.count()
+            'total_responses': responses.count(),
+            'cluster_count': top_clusters.count(),
+            'clusters': clusters_data
         }
         
     except Survey.DoesNotExist:

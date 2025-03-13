@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 15px;
+            background: #0070f3;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0051a8;
+        }
+        input {
+            padding: 8px;
+            margin: 5px 0;
+            width: 300px;
+        }
+        pre {
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Export Test Page</h1>
+        
+        <div>
+            <label for="surveyId">Survey ID:</label>
+            <input type="text" id="surveyId" value="1" />
+        </div>
+        
+        <div style="margin-top: 20px;">
+            <button id="testBtn">Test Export Endpoint</button>
+            <button id="exportBtn">Export Responses</button>
+        </div>
+        
+        <h3>Result:</h3>
+        <pre id="result">No result yet</pre>
+    </div>
+
+    <script>
+        document.getElementById('testBtn').addEventListener('click', async () => {
+            const resultEl = document.getElementById('result');
+            const surveyId = document.getElementById('surveyId').value;
+            
+            resultEl.textContent = 'Testing...';
+            
+            try {
+                const response = await fetch(`/api/surveys/${surveyId}/test-export`);
+                const data = await response.json();
+                
+                resultEl.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                console.error(error);
+            }
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', async () => {
+            const resultEl = document.getElementById('result');
+            const surveyId = document.getElementById('surveyId').value;
+            
+            resultEl.textContent = 'Exporting...';
+            
+            try {
+                // Test both with and without the trailing slash
+                const exportUrl = `/api/surveys/${surveyId}/export_responses`;
+                
+                console.log(`Attempting export with URL: ${exportUrl}`);
+                
+                const response = await fetch(exportUrl, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    },
+                });
+                
+                console.log('Export response:', response);
+                
+                if (!response.ok) {
+                    let errorMsg;
+                    try {
+                        const errorData = await response.json();
+                        errorMsg = JSON.stringify(errorData);
+                    } catch {
+                        errorMsg = await response.text();
+                    }
+                    
+                    throw new Error(`Export failed: ${response.status} ${response.statusText} - ${errorMsg}`);
+                }
+                
+                // Handle success - download the file
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                    throw new Error('Received empty file');
+                }
+                
+                resultEl.textContent = `Success! File size: ${blob.size} bytes`;
+                
+                // Create download link
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = downloadUrl;
+                a.download = `survey_${surveyId}_responses.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                
+                // Clean up
+                window.URL.revokeObjectURL(downloadUrl);
+                document.body.removeChild(a);
+                
+            } catch (error) {
+                resultEl.textContent = `Error: ${error.message}`;
+                console.error(error);
+            }
+        });
+    </script>
+</body>
+</html> 

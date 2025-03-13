@@ -10,8 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import { CustomWordCluster } from '@/types/cluster';
-import { getCustomClusters, createCustomCluster, deleteCustomCluster } from '@/lib/services/cluster-service';
-import { Trash2, ChevronDown, ChevronUp, BarChart } from 'lucide-react';
+import { getCustomClusters, createCustomCluster, deleteCustomCluster, toggleClusterStatus } from '@/lib/services/cluster-service';
+import { Trash2, ChevronDown, ChevronUp, BarChart, Edit, Languages } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { handleAuthError } from '@/lib/auth-utils';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { fetchClient } from '@/lib/fetch-client';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { Switch } from '@/components/ui/switch';
+import ClusterEditForm from '@/components/clusters/ClusterEditForm';
 
 interface ProcessTextResponse {
   original_text: string;
@@ -65,6 +66,7 @@ export default function SettingsClient() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [structuredWords, setStructuredWords] = useState<StructuredWord[]>([]);
   const [sentences, setSentences] = useState<{text: string; sentiment: number; index: number}[]>([]);
+  const [editingCluster, setEditingCluster] = useState<CustomWordCluster | null>(null);
   const { toast } = useToast();
 
   // Get sentiment color based on score
@@ -204,156 +206,174 @@ export default function SettingsClient() {
     }
   };
 
+  const handleEditCluster = (cluster: CustomWordCluster) => {
+    setEditingCluster(cluster);
+  };
+
+  const handleClusterUpdated = (updatedCluster: CustomWordCluster) => {
+    // Update the clusters list
+    setClusters(prevClusters => prevClusters.map(c => 
+      c.id === updatedCluster.id ? updatedCluster : c
+    ));
+  };
+
+  const handleToggleStatus = async (id: number) => {
+    try {
+      setLoading(true);
+      await toggleClusterStatus(id);
+      await loadClusters(); // Reload all clusters to get updated status
+      toast({
+        title: 'Success',
+        description: 'Cluster status updated successfully',
+      });
+    } catch (error: any) {
+      console.error('Error toggling cluster status:', error);
+      await handleAuthError(error);
+      toast({
+        title: t('general.error'),
+        description: 'Failed to update cluster status. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <div className="container py-8">
-      <h1 className="text-3xl font-bold mb-8">{t('general.title')}</h1>
-      
+    <div className="container mx-auto py-6 space-y-8">
+      <h1 className="text-3xl font-bold mb-6">{t('settings.title')}</h1>
+
       <Tabs defaultValue="clusters">
-        <TabsList className="mb-6">
+        <TabsList className="mb-4">
           <TabsTrigger value="clusters">Word Clusters</TabsTrigger>
-          <TabsTrigger value="text-processing">Text Processing</TabsTrigger>
-          <TabsTrigger value="account">{t('navigation.account')}</TabsTrigger>
-          <TabsTrigger value="preferences">{t('navigation.appearance')}</TabsTrigger>
+          <TabsTrigger value="text-processor">Text Processor</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="clusters">
           <Card>
             <CardHeader>
-              <CardTitle>Word Cluster Management</CardTitle>
+              <CardTitle>Manage Custom Word Clusters</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="mb-6">
-                <form onSubmit={handleSubmit} className="flex items-end gap-4">
+              <form onSubmit={handleSubmit} className="mb-6">
+                <div className="flex items-end space-x-2">
                   <div className="flex-1">
-                    <Label htmlFor="cluster-name">Create New Cluster</Label>
+                    <Label htmlFor="cluster-name">New Cluster Name</Label>
                     <Input
                       id="cluster-name"
                       placeholder="Enter cluster name"
                       value={newClusterName}
                       onChange={(e) => setNewClusterName(e.target.value)}
-                      disabled={isAdding}
                     />
                   </div>
                   <Button type="submit" disabled={isAdding || !newClusterName.trim()}>
                     {isAdding ? 'Adding...' : 'Add Cluster'}
                   </Button>
-                </form>
-              </div>
-              
-              <h3 className="text-lg font-semibold mb-4">Your Clusters</h3>
-              {loading ? (
-                <div className="text-center py-4">Loading clusters...</div>
-              ) : clusters.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground">
-                  No word clusters defined yet. Create your first one above.
                 </div>
-              ) : (
+              </form>
+
+              <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead>Created On</TableHead>
+                      <TableHead>Keywords</TableHead>
+                      <TableHead>Languages</TableHead>
                       <TableHead>Created By</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {clusters.map((cluster) => (
-                      <TableRow key={cluster.id}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {cluster.name}
-                          </div>
-                        </TableCell>
-                        <TableCell>{cluster.description}</TableCell>
-                        <TableCell>{formatDate(cluster.created_at)}</TableCell>
-                        <TableCell>{cluster.created_by_name}</TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(cluster.id);
-                            }}
-                            title="Delete cluster"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                    {loading && !clusters.length ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4">
+                          Loading clusters...
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : !clusters.length ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4">
+                          No custom clusters added yet.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      clusters.map((cluster) => (
+                        <TableRow key={cluster.id}>
+                          <TableCell className="font-medium">{cluster.name}</TableCell>
+                          <TableCell className="max-w-xs truncate">
+                            {cluster.description || 'No description'}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {cluster.keywords && cluster.keywords.length > 0 ? (
+                                cluster.keywords.slice(0, 3).map((keyword, idx) => (
+                                  <Badge key={idx} variant="secondary">{keyword}</Badge>
+                                ))
+                              ) : (
+                                cluster.multilingual_keywords && Object.keys(cluster.multilingual_keywords).length > 0 ? (
+                                  // If no default keywords but has language-specific ones
+                                  Object.values(cluster.multilingual_keywords)[0].slice(0, 3).map((keyword, idx) => (
+                                    <Badge key={idx} variant="secondary">{keyword}</Badge>
+                                  ))
+                                ) : (
+                                  <span className="text-gray-500 text-sm">No keywords</span>
+                                )
+                              )}
+                              {cluster.keywords && cluster.keywords.length > 3 && (
+                                <Badge variant="outline">+{cluster.keywords.length - 3} more</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {/* Display supported languages */}
+                            <div className="flex gap-1">
+                              {cluster.multilingual_keywords && Object.keys(cluster.multilingual_keywords).length > 0 ? (
+                                Object.keys(cluster.multilingual_keywords).map(lang => (
+                                  <Badge key={lang} variant="outline" className="uppercase">{lang}</Badge>
+                                ))
+                              ) : (
+                                <Badge variant="outline">Default</Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{cluster.created_by_name}</TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={cluster.is_active}
+                              onCheckedChange={() => handleToggleStatus(cluster.id)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex space-x-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleEditCluster(cluster)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" /> Edit
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDelete(cluster.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="account">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('account.title')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-6">
-                {t('account.profileInfo')}
-              </p>
-              
-              {/* Account settings will go here */}
-              <div className="space-y-4">
-                <Button disabled>{t('account.changePassword')}</Button>
-                <br />
-                <Button variant="destructive" disabled>{t('account.deleteAccount')}</Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
-        
-        <TabsContent value="preferences">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('appearance.title')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <Label>{t('appearance.theme')}</Label>
-                  <Select defaultValue="system">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="light">{t('appearance.themes.light')}</SelectItem>
-                      <SelectItem value="dark">{t('appearance.themes.dark')}</SelectItem>
-                      <SelectItem value="system">{t('appearance.themes.system')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label>{t('language.title')}</Label>
-                  <Select defaultValue="en">
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">{t('language.languages.en')}</SelectItem>
-                      <SelectItem value="fr">{t('language.languages.fr')}</SelectItem>
-                      <SelectItem value="es">{t('language.languages.es')}</SelectItem>
-                      <SelectItem value="de">{t('language.languages.de')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <Button disabled>{t('general.save')}</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        <TabsContent value="text-processing">
+
+        <TabsContent value="text-processor">
           <Card>
             <CardHeader>
               <CardTitle>Text Processing Test Tool</CardTitle>
@@ -573,6 +593,16 @@ export default function SettingsClient() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Cluster Edit Dialog */}
+      {editingCluster && (
+        <ClusterEditForm
+          cluster={editingCluster}
+          isOpen={Boolean(editingCluster)}
+          onClose={() => setEditingCluster(null)}
+          onClusterUpdated={handleClusterUpdated}
+        />
+      )}
     </div>
   );
 } 

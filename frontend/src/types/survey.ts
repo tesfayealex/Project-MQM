@@ -27,6 +27,9 @@ export interface Survey {
   created_at?: string;
   updated_at?: string;
   is_active?: boolean;
+  // Template Relationship
+  template?: number; // FK to Template
+  template_detail?: any; // Detailed template information
   questions: SurveyQuestion[];
   languages: string[];
   format?: string;

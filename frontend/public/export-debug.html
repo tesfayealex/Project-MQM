@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Debug Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1, h2 {
+            color: #333;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #0070f3;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0051a8;
+        }
+        pre {
+            background-color: #f1f1f1;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        .logs {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Export Debug Tool</h1>
+        
+        <div class="card">
+            <h2>Test Export Endpoints</h2>
+            <div class="form-group">
+                <label for="surveyId">Survey ID:</label>
+                <input type="text" id="surveyId" value="15" />
+            </div>
+            
+            <div class="form-group">
+                <button id="testApiBtn">Test API Connection</button>
+                <button id="exportWithSlashBtn">Export With Slash</button>
+                <button id="exportNoSlashBtn">Export Without Slash</button>
+                <button id="directBackendBtn">Direct Backend Test</button>
+                <button id="clearLogsBtn">Clear Logs</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>Debug Logs</h2>
+            <div class="logs" id="logs">
+                <div>Ready to test...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Function to add log message
+        function addLog(message, isError = false) {
+            const logsDiv = document.getElementById('logs');
+            const logItem = document.createElement('div');
+            logItem.textContent = `[${new Date().toISOString()}] ${message}`;
+            logItem.className = isError ? 'error' : '';
+            logsDiv.appendChild(logItem);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+        
+        // Test API connection
+        document.getElementById('testApiBtn').addEventListener('click', async () => {
+            const surveyId = document.getElementById('surveyId').value;
+            if (!surveyId) {
+                addLog('Please enter a Survey ID', true);
+                return;
+            }
+            
+            addLog(`Testing API connection for survey ID: ${surveyId}`);
+            
+            try {
+                // Direct call to backend - use for testing if needed
+                // const directUrl = `http://localhost:8000/api/surveys/surveys/${surveyId}/test-export/`;
+                
+                const response = await fetch(`/api/surveys/${surveyId}/test-export/`);
+                addLog(`Response status: ${response.status} ${response.statusText}`);
+                
+                const data = await response.json();
+                addLog(`Response data: ${JSON.stringify(data)}`);
+                
+                if (response.ok) {
+                    addLog('Test successful! ✅', false);
+                } else {
+                    addLog(`Test failed: ${data.error || 'Unknown error'}`, true);
+                }
+            } catch (error) {
+                addLog(`Error: ${error.message}`, true);
+                console.error(error);
+            }
+        });
+        
+        // Export with trailing slash
+        document.getElementById('exportWithSlashBtn').addEventListener('click', async () => {
+            const surveyId = document.getElementById('surveyId').value;
+            if (!surveyId) {
+                addLog('Please enter a Survey ID', true);
+                return;
+            }
+            
+            addLog(`Exporting with trailing slash for survey ID: ${surveyId}`);
+            
+            try {
+                // Direct call to backend - use for testing if needed
+                // const directUrl = `http://localhost:8000/api/surveys/surveys/${surveyId}/export_responses/`;
+                
+                const response = await fetch(`/api/surveys/${surveyId}/export_responses/`, {
+                    method: 'GET',
+                    credentials: 'include',
+                });
+                
+                addLog(`Response status: ${response.status} ${response.statusText}`);
+                
+                // Check if response is OK
+                if (!response.ok) {
+                    // Try to get error details
+                    let errorDetails;
+                    try {
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            const errorJson = await response.json();
+                            errorDetails = JSON.stringify(errorJson);
+                        } else {
+                            errorDetails = await response.text();
+                        }
+                    } catch (e) {
+                        errorDetails = 'Could not extract error details';
+                    }
+                    
+                    addLog(`Export failed: ${errorDetails}`, true);
+                    return;
+                }
+                
+                // Try to get the file
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                    addLog('Received an empty file', true);
+                    return;
+                }
+                
+                const contentType = response.headers.get('content-type');
+                addLog(`Content type: ${contentType}`);
+                addLog(`File size: ${blob.size} bytes`);
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `survey_${surveyId}_responses.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                addLog('Export successful! File download initiated ✅');
+            } catch (error) {
+                addLog(`Error: ${error.message}`, true);
+                console.error(error);
+            }
+        });
+        
+        // Export without trailing slash
+        document.getElementById('exportNoSlashBtn').addEventListener('click', async () => {
+            const surveyId = document.getElementById('surveyId').value;
+            if (!surveyId) {
+                addLog('Please enter a Survey ID', true);
+                return;
+            }
+            
+            addLog(`Exporting without trailing slash for survey ID: ${surveyId}`);
+            
+            try {
+                const response = await fetch(`/api/surveys/${surveyId}/export_responses`, {
+                    method: 'GET',
+                    credentials: 'include',
+                });
+                
+                addLog(`Response status: ${response.status} ${response.statusText}`);
+                
+                // Check if response is OK
+                if (!response.ok) {
+                    // Try to get error details
+                    let errorDetails;
+                    try {
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            const errorJson = await response.json();
+                            errorDetails = JSON.stringify(errorJson);
+                        } else {
+                            errorDetails = await response.text();
+                        }
+                    } catch (e) {
+                        errorDetails = 'Could not extract error details';
+                    }
+                    
+                    addLog(`Export failed: ${errorDetails}`, true);
+                    return;
+                }
+                
+                // Try to get the file
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                    addLog('Received an empty file', true);
+                    return;
+                }
+                
+                const contentType = response.headers.get('content-type');
+                addLog(`Content type: ${contentType}`);
+                addLog(`File size: ${blob.size} bytes`);
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `survey_${surveyId}_responses.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                addLog('Export successful! File download initiated ✅');
+            } catch (error) {
+                addLog(`Error: ${error.message}`, true);
+                console.error(error);
+            }
+        });
+        
+        // Direct Backend Test
+        document.getElementById('directBackendBtn').addEventListener('click', async () => {
+            const surveyId = document.getElementById('surveyId').value;
+            if (!surveyId) {
+                addLog('Please enter a Survey ID', true);
+                return;
+            }
+            
+            addLog(`Making direct backend request for survey ID: ${surveyId}`);
+            
+            try {
+                // Direct call to backend with correct URL structure
+                const directUrl = `http://localhost:8000/api/surveys/surveys/${surveyId}/export_responses/`;
+                addLog(`Using direct URL: ${directUrl}`);
+                
+                const response = await fetch(directUrl, {
+                    method: 'GET',
+                    credentials: 'include',
+                });
+                
+                addLog(`Response status: ${response.status} ${response.statusText}`);
+                
+                // Check if response is OK
+                if (!response.ok) {
+                    // Try to get error details
+                    let errorDetails;
+                    try {
+                        const contentType = response.headers.get('content-type');
+                        if (contentType && contentType.includes('application/json')) {
+                            const errorJson = await response.json();
+                            errorDetails = JSON.stringify(errorJson);
+                        } else {
+                            errorDetails = await response.text();
+                        }
+                    } catch (e) {
+                        errorDetails = 'Could not extract error details';
+                    }
+                    
+                    addLog(`Direct test failed: ${errorDetails}`, true);
+                    return;
+                }
+                
+                // Try to get the file
+                const blob = await response.blob();
+                
+                if (blob.size === 0) {
+                    addLog('Received an empty file', true);
+                    return;
+                }
+                
+                const contentType = response.headers.get('content-type');
+                addLog(`Content type: ${contentType}`);
+                addLog(`File size: ${blob.size} bytes`);
+                
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `survey_${surveyId}_responses.xlsx`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                addLog('Direct backend test successful! File download initiated ✅');
+            } catch (error) {
+                addLog(`Error: ${error.message}`, true);
+                console.error(error);
+            }
+        });
+        
+        // Clear logs
+        document.getElementById('clearLogsBtn').addEventListener('click', () => {
+            document.getElementById('logs').innerHTML = '<div>Logs cleared...</div>';
+        });
+    </script>
+</body>
+</html> 

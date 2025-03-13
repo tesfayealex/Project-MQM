@@ -849,14 +849,14 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
                 Satisfaction Metrics
               </h3>
               <div className="flex-grow">
-                <SatisfactionMetricsChart 
-                  average={summary.average_satisfaction}
-                  median={summary.median_satisfaction}
-                  low={summary.satisfaction_confidence_low}
-                  high={summary.satisfaction_confidence_high}
-                />
-                <div className="text-xs text-gray-500 mt-2 text-center">
-                  95% confidence interval: {summary.satisfaction_confidence_low.toFixed(1)} - {summary.satisfaction_confidence_high.toFixed(1)}
+              <SatisfactionMetricsChart 
+                average={summary.average_satisfaction}
+                median={summary.median_satisfaction}
+                low={summary.satisfaction_confidence_low}
+                high={summary.satisfaction_confidence_high}
+              />
+              <div className="text-xs text-gray-500 mt-2 text-center">
+                95% confidence interval: {summary.satisfaction_confidence_low.toFixed(1)} - {summary.satisfaction_confidence_high.toFixed(1)}
                 </div>
               </div>
               <div className="mt-3 text-center">
@@ -870,22 +870,22 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
             <Card className="p-4 min-h-[250px] flex flex-col">
               <h3 className="text-lg font-semibold mb-4">Sentiment Overview</h3>
               <div className="flex-grow">
-                <SentimentChart
-                  positive={summary.positive_percentage}
-                  negative={summary.negative_percentage}
-                  neutral={summary.neutral_percentage}
-                  improved={true}
-                />
-              </div>
+              <SentimentChart
+                positive={summary.positive_percentage}
+                negative={summary.negative_percentage}
+                neutral={summary.neutral_percentage}
+                improved={true}
+              />
+                </div>
             </Card>
-          </div>
+                </div>
 
           <Card className="p-6 h-auto">
             <div className="flex justify-between items-center mb-5">
               <div className="flex items-center space-x-3">
                 <CloudIcon className="w-5 h-5 text-blue-500" />
                 <h3 className="text-lg font-medium">{wordCloudMode === 'words' ? 'Word Cloud' : 'Cluster Cloud'}</h3>
-              </div>
+                </div>
               <div className="flex items-center space-x-3">
                 {/* Color mode selector */}
                 <div className="flex items-center px-2 py-1 border rounded-lg bg-white shadow-sm mr-2">
@@ -912,8 +912,8 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
                       NPS
                     </button>
                   </div>
-                </div>
-                
+          </div>
+
                 {/* Language Selector - Only show for Words mode */}
                 {wordCloudMode === 'words' && (
                   <Button
@@ -964,9 +964,9 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
                       </span>
                     )}
                     </button>
+                  </div>
                 </div>
               </div>
-            </div>
             <div className="min-h-[450px]">
               <WordCloudChart 
                 words={wordCloudMode === 'words' ? wordCloud : clusterCloud} 
@@ -1040,12 +1040,12 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
             <Card className="p-6 flex flex-col">
               <h3 className="text-lg font-semibold mb-5">Sentiment Divergence</h3>
               <div className="flex-grow">
-                <SentimentDivergenceChart
-                  divergence={summary.sentiment_divergence}
-                  positivePercentage={summary.positive_percentage}
-                  negativePercentage={summary.negative_percentage}
-                  neutralPercentage={summary.neutral_percentage}
-                />
+              <SentimentDivergenceChart
+                divergence={summary.sentiment_divergence}
+                positivePercentage={summary.positive_percentage}
+                negativePercentage={summary.negative_percentage}
+                neutralPercentage={summary.neutral_percentage}
+              />
               </div>
             </Card>
           </div>
@@ -1053,31 +1053,31 @@ export default function SurveyAnalysisClient({ surveyId }: SurveyAnalysisProps) 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <Card className="p-6 min-h-[400px] flex flex-col">
               <div className="flex-grow">
-                <ClusterList
-                  clusters={summary.top_positive_clusters_data?.slice(0, 6) || []}
-                  title="Positive Clusters"
-                  positiveTheme={true}
-                />
+              <ClusterList
+                clusters={summary.top_positive_clusters_data?.slice(0, 6) || []}
+                title="Positive Clusters"
+                positiveTheme={true}
+              />
               </div>
             </Card>
 
             <Card className="p-6 min-h-[400px] flex flex-col">
               <div className="flex-grow">
-                <ClusterList
-                  clusters={summary.top_negative_clusters_data?.slice(0, 6) || []}
-                  title="Negative Clusters"
-                  negativeTheme={true}
-                />
+              <ClusterList
+                clusters={summary.top_negative_clusters_data?.slice(0, 6) || []}
+                title="Negative Clusters"
+                negativeTheme={true}
+              />
               </div>
             </Card>
 
             <Card className="p-6 min-h-[400px] flex flex-col">
               <div className="flex-grow">
-                <ClusterList
-                  clusters={summary.top_neutral_clusters_data?.slice(0, 6) || []}
-                  title="Neutral Clusters"
-                  neutralTheme={true}
-                />
+              <ClusterList
+                clusters={summary.top_neutral_clusters_data?.slice(0, 6) || []}
+                title="Neutral Clusters"
+                neutralTheme={true}
+              />
               </div>
             </Card>
           </div>

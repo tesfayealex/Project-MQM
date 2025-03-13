@@ -1,4 +1,4 @@
-You are an expert in sentiment analysis from a given sentence. You job is first to separate a given text into sentences or phrases based on either diffrent sentiment of puctuations that make sense like ";" or "." or others that clearly show that.
+You are an expert in sentiment analysis from a given sentence which were collected from a survey. You job is first to separate a given text into sentences or phrases based on either diffrent sentiment of puctuations that make sense like ";" or "." or others that clearly show that.
 
 Steps to be taken
 

@@ -99,23 +99,28 @@ class Survey(models.Model):
         
         # After saving, if this is a new survey and it has a token but no SurveyToken objects,
         # create a SurveyToken for backward compatibility
-        if is_new and self.token and not self.tokens.exists():
-            SurveyToken.objects.create(
-                survey=self,
-                token=self.token,
-                description="Default Token"
-            )
-        # Alternatively, if new and no token exists at all, create a default token
-        elif is_new and not self.tokens.exists():
-            import random
-            import string
-            # Generate a random token
-            random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-            SurveyToken.objects.create(
-                survey=self,
-                token=random_token,
-                description="Default Token"
-            )
+        # print("Survey Token: " + str(self.token))
+        # print("Survey Tokens: " + str(self.tokens))
+        # print("Survey Tokens Exists: " + str(self.tokens.exists()))
+        # print("Survey Token Exists: " + str(self.tokens.all()))
+
+        # if is_new and self.token and not self.tokens.exists():
+        #     SurveyToken.objects.create(
+        #         survey=self,
+        #         token=self.token,
+        #         description="Default Token"
+        #     )
+        # # Alternatively, if new and no token exists at all, create a default token
+        # elif is_new and not self.tokens.exists():
+        #     import random
+        #     import string
+        #     # Generate a random token
+        #     random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+        #     SurveyToken.objects.create(
+        #         survey=self,
+        #         token=random_token,
+        #         description="Default Token"
+        #     )
 
 
 class SurveyToken(models.Model):
@@ -351,7 +356,7 @@ class WordCluster(models.Model):
     frequency = models.IntegerField(default=0)
     survey = models.ForeignKey('Survey', on_delete=models.CASCADE, related_name='word_clusters')
     is_positive = models.BooleanField(default=False)
-    is_negative = models.BooleanField(default=False)
+    is_negative = models.BooleanField(default=(False))
     is_neutral = models.BooleanField(default=True)
     category = models.CharField(max_length=50, default='neutral', choices=(
         ('positive', 'Positive'),
@@ -378,7 +383,12 @@ class CustomWordCluster(models.Model):
     """
     name = models.CharField(max_length=100, help_text="Name of the custom cluster (e.g., 'Customer Service')")
     description = models.TextField(blank=True, help_text="Description of what this cluster represents")
+    # Add multilingual support for name, description and keywords
+    names = models.JSONField(default=dict, blank=True, help_text="Name for each language: {'en': 'English Name', 'de': 'German Name', 'fr': 'French Name', 'es': 'Spanish Name'}")
+    descriptions = models.JSONField(default=dict, blank=True, help_text="Description for each language: {'en': 'English Description', 'de': 'German Description', 'fr': 'French Description', 'es': 'Spanish Description'}")
     keywords = models.JSONField(default=list, help_text="List of keywords/phrases that belong to this cluster")
+    # Updated keywords to be language-specific
+    multilingual_keywords = models.JSONField(default=dict, blank=True, help_text="Keywords for each language: {'en': ['word1', 'word2'], 'de': ['wort1', 'wort2'], 'fr': ['mot1', 'mot2'], 'es': ['palabra1', 'palabra2']}")
     is_active = models.BooleanField(default=True, help_text="Whether this cluster is currently active")
     created_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name='custom_clusters')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -394,18 +404,34 @@ class CustomWordCluster(models.Model):
     def __str__(self):
         return f"{self.name} ({len(self.keywords)} keywords)"
     
-    def matches_word(self, word):
-        """Check if a word matches any of the keywords in this cluster."""
+    def matches_word(self, word, language=None):
+        """
+        Check if a word matches any of the keywords in this cluster.
+        If language is specified, it will check the language-specific keywords.
+        Otherwise, it will check all languages and the legacy keywords list.
+        """
         if not word:
             return False
             
         # Convert word to lowercase for case-insensitive matching
         word = word.lower()
         
-        # Check if word matches any of the keywords
+        # Check if word matches any of the legacy keywords
         for keyword in self.keywords:
             if keyword.lower() in word or word in keyword.lower():
                 return True
+        
+        # If a specific language is provided, check only that language's keywords
+        if language and language in self.multilingual_keywords:
+            for keyword in self.multilingual_keywords[language]:
+                if keyword.lower() in word or word in keyword.lower():
+                    return True
+        # If no language is specified, check all language-specific keywords
+        elif not language:
+            for lang, keywords in self.multilingual_keywords.items():
+                for keyword in keywords:
+                    if keyword.lower() in word or word in keyword.lower():
+                        return True
         
         return False
     
@@ -536,6 +562,9 @@ class SurveyAnalysisSummary(models.Model):
     top_negative_clusters = models.JSONField(default=list, help_text="IDs of most negative clusters") 
     top_neutral_clusters = models.JSONField(default=list, help_text="IDs of most neutral clusters")
     
+    # Detailed metrics for clusters (contains frequency, sentiment, etc.)
+    metrics = models.JSONField(default=dict, help_text="Detailed metrics data for clusters and other analysis")
+    
     # Weighted sentiment divergence
     sentiment_divergence = models.FloatField(default=0.0, help_text="Frequency weighted sentiment score divergence")
     
@@ -653,4 +682,3 @@ def process_response_answers(sender, instance, created, **kwargs):
         
         # Start background thread
         Thread(target=process_answers_task).start()
-

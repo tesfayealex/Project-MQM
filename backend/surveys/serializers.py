@@ -98,9 +98,14 @@ class SurveySerializer(serializers.ModelSerializer):
         # We're not using this field anymore, but we need to set it to something unique
         import random
         import string
-        random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
-        validated_data['token'] = random_token
 
+        if len(tokens_data) == 0:
+            random_token = ''.join(random.choices(string.ascii_lowercase + string.digits, k=10))
+            
+            validated_data['token'] = random_token
+        
+        else:
+            validated_data['token'] = tokens_data[0].get('token')
         survey = super().create(validated_data)
         
         # Create tokens if provided
@@ -379,14 +384,20 @@ class CustomWordClusterSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'keywords', 'is_active',
             'created_by', 'created_by_name', 'created_at', 'updated_at',
-            'word_count', 'last_processed', 'associated_words'
+            'word_count', 'last_processed', 'associated_words',
+            # Add new multi-language fields
+            'names', 'descriptions', 'multilingual_keywords'
         ]
         read_only_fields = ['created_at', 'updated_at', 'created_by', 'created_by_name', 
                           'word_count', 'last_processed', 'associated_words']
         extra_kwargs = {
             'description': {'required': False},
             'keywords': {'required': False, 'default': list},
-            'is_active': {'required': False, 'default': True}
+            'is_active': {'required': False, 'default': True},
+            # Add new multi-language fields as not required
+            'names': {'required': False, 'default': dict},
+            'descriptions': {'required': False, 'default': dict},
+            'multilingual_keywords': {'required': False, 'default': dict}
         }
     
     def get_created_by_name(self, obj):
@@ -454,11 +465,49 @@ class SurveyAnalysisSummarySerializer(serializers.ModelSerializer):
         return self._get_clusters_data(cluster_ids)
     
     def _get_clusters_data(self, cluster_ids):
-        # Helper method to fetch cluster data from IDs
-        from .models import WordCluster, CustomWordCluster, ResponseWord
-        
+        """Helper method to fetch cluster data from IDs."""
         if not cluster_ids:
             return []
+            
+        # First check if we have metrics data for these clusters
+        metrics = self.instance.metrics.get('cluster_metrics', {}) if hasattr(self.instance, 'metrics') else {}
+        
+        # If we have metrics for at least some clusters, use that data
+        if metrics:
+            # Create data directly from stored metrics
+            cluster_data_list = []
+            
+            for cluster_id in cluster_ids:
+                # Convert to string since JSON keys are strings
+                str_cluster_id = str(cluster_id)
+                
+                # If we have metrics for this cluster, use them
+                if str_cluster_id in metrics:
+                    cluster_metric = metrics[str_cluster_id]
+                    
+                    # Create a dict representing cluster data
+                    cluster_data = {
+                        'id': cluster_id,
+                        'name': cluster_metric.get('name', 'Unknown'),
+                        'survey': self.instance.survey_id,
+                        'description': cluster_metric.get('description', ''),
+                        'frequency': cluster_metric.get('frequency', 0),
+                        'response_count': cluster_metric.get('response_count', 0),
+                        'sentiment_score': cluster_metric.get('sentiment_score', 0),
+                        'nps_score': cluster_metric.get('nps_score'),
+                        'is_positive': cluster_metric.get('is_positive', False),
+                        'is_negative': cluster_metric.get('is_negative', False),
+                        'is_neutral': cluster_metric.get('is_neutral', True),
+                        'custom_cluster_id': cluster_id,
+                    }
+                    cluster_data_list.append(cluster_data)
+            
+            # If we found metrics data for all clusters, return it
+            if cluster_data_list and len(cluster_data_list) == len(cluster_ids):
+                return sorted(cluster_data_list, key=lambda x: x.get('frequency', 0), reverse=True)
+        
+        # Fall back to original behavior if metrics aren't available
+        from .models import WordCluster, CustomWordCluster, ResponseWord
         
         # First check if these are CustomWordCluster IDs
         custom_clusters = list(CustomWordCluster.objects.filter(id__in=cluster_ids))
@@ -531,6 +580,38 @@ class SurveyAnalysisSummarySerializer(serializers.ModelSerializer):
             return WordClusterSerializer(clusters, many=True).data
             
         # If neither is found, return empty list
+        return []
+
+    def get_clusters(self, obj):
+        from .models import CustomWordCluster
+        from django.db.models import Count, Avg, Q
+        
+        cluster_ids = obj.top_clusters or []
+        if not cluster_ids:
+            return []
+        
+        # Get CustomWordCluster models
+        custom_clusters = list(CustomWordCluster.objects.filter(id__in=cluster_ids))
+        if custom_clusters:
+            # Populate fields as needed
+            cluster_data_list = []
+            for cc in custom_clusters:
+                cluster_data = {
+                    'id': cc.id,
+                    'name': cc.name,
+                    'description': cc.description or '',
+                    'frequency': 0,  # Will be populated from survey data if possible
+                    'sentiment_score': 0,
+                    'is_positive': False,
+                    'is_negative': False,
+                    'is_neutral': True,
+                    'custom_cluster_id': cc.id,
+                }
+                cluster_data_list.append(cluster_data)
+            
+            return sorted(cluster_data_list, key=lambda x: x.get('frequency', 0), reverse=True)
+            
+        # If no clusters found, return empty list
         return []
 
 

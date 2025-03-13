@@ -181,7 +181,15 @@ export function WordCloudChart({
     // Get the color for a word based on sentiment or NPS
     const getWordColor = (word: WordCloudItem) => {
         if (displayMode === 'clusters') {
-            // For clusters, explicitly check categorization flags
+            // First handle NPS-based coloring if that's what was selected
+            if (internalColorBy === 'nps' && word.nps_score !== undefined && word.nps_score !== null) {
+                if (word.nps_score >= 9) return '#22C55E'; // bright green for promoters
+                if (word.nps_score <= 6) return '#EF4444'; // bright red for detractors
+                return '#F59E0B'; // amber for passives (7-8)
+            }
+            
+            // If NPS is selected but not available, or if sentiment is selected,
+            // check the boolean flags first
             if ('is_positive' in word && word.is_positive) {
                 return '#22C55E'; // bright green for positive clusters
             } else if ('is_negative' in word && word.is_negative) {
@@ -190,8 +198,13 @@ export function WordCloudChart({
                 return '#F59E0B'; // amber for neutral clusters - more visible than gray
             }
             
-            // If no flags but we have a sentiment score, use that
-            if (word.sentiment_score !== undefined) {
+            // If no flags, fall back to numerical scores based on selected colorBy
+            if (internalColorBy === 'nps' && word.nps_score !== undefined && word.nps_score !== null) {
+                if (word.nps_score >= 9) return '#22C55E';
+                if (word.nps_score <= 6) return '#EF4444';
+                return '#F59E0B';
+            } else if (word.sentiment_score !== undefined) {
+                // Default to sentiment-based coloring
                 if (word.sentiment_score > 0.1) return '#22C55E';
                 if (word.sentiment_score < -0.1) return '#EF4444';
                 return '#F59E0B';
@@ -386,11 +399,11 @@ export function WordCloudChart({
                 <div className="border rounded-md p-4 bg-white dark:bg-gray-950 min-h-[400px] h-auto relative">
                     <div className="absolute inset-0 overflow-hidden">
                         <div className="h-full overflow-auto py-4 px-2">
-                            <TagCloud
+            <TagCloud
                                 key={cloudKey} // Add key to force re-render when colorBy changes
                                 minSize={18}  
                                 maxSize={48}  // Adjusted max size for words
-                                tags={tagCloudData}
+                tags={tagCloudData}
                                 colorOptions={cloudOptions}
                                 renderer={rendererWithTypeAssertion}
                                 className="horizontal-cloud"

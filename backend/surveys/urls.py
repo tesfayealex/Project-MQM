@@ -6,7 +6,8 @@ from .views import (
     ProcessTextView, ProcessSurveyResponsesView, TemplateViewSet,
     survey_sentence_sentiment_analysis, process_answer_sentiment,
     process_survey_sentence_sentiment, check_survey_has_responses,
-    debug_survey_questions
+    debug_survey_questions, test_export_endpoint, export_survey_responses_excel,
+    export_survey_clusters_excel
 )
 
 router = DefaultRouter()
@@ -27,5 +28,8 @@ urlpatterns = [
     path('surveys/<int:survey_id>/process-sentence-sentiment/', process_survey_sentence_sentiment, name='process-survey-sentence-sentiment'),
     path('surveys/<int:survey_id>/check-has-responses/', check_survey_has_responses, name='check-survey-has-responses'),
     path('surveys/<int:survey_id>/debug-questions/', debug_survey_questions, name='debug-survey-questions'),
+    path('surveys/<int:survey_id>/test-export/', test_export_endpoint, name='test-export-endpoint'),
+    path('surveys/<int:survey_id>/excel-export/', export_survey_responses_excel, name='survey-excel-export'),
+    path('surveys/<int:survey_id>/clusters-export/', export_survey_clusters_excel, name='survey-clusters-export'),
 ]
 

@@ -193,25 +193,75 @@ def cluster_responses(text_responses, min_samples=2, eps=0.5):
     Returns:
         Dictionary with cluster labels as keys and lists of text indices as values
     """
-    if not text_responses or len(text_responses) < min_samples:
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    if not text_responses:
+        logger.warning("No text responses provided for clustering")
         return {}
     
-    # Convert text to numerical features using TF-IDF
-    vectorizer = TfidfVectorizer(max_features=100)
-    features = vectorizer.fit_transform(text_responses)
+    if len(text_responses) < min_samples:
+        logger.warning(f"Too few text responses ({len(text_responses)}) for clustering with min_samples={min_samples}")
+        # If only 1 text response, create a single cluster with it
+        if len(text_responses) == 1:
+            logger.info("Creating single manual cluster for 1 text response")
+            return {0: [0]}
+        return {}
     
-    # Apply DBSCAN clustering
-    db = DBSCAN(eps=eps, min_samples=min_samples)
-    labels = db.fit_predict(features)
-    
-    # Group indices by cluster label
-    clusters = {}
-    for i, label in enumerate(labels):
-        if label not in clusters:
-            clusters[label] = []
-        clusters[label].append(i)
-    
-    return clusters
+    try:
+        logger.info(f"Starting clustering of {len(text_responses)} text responses")
+        
+        # Convert text to numerical features using TF-IDF
+        # Use lower max_features for small datasets
+        max_features = min(100, len(text_responses) * 5)
+        vectorizer = TfidfVectorizer(max_features=max_features)
+        features = vectorizer.fit_transform(text_responses)
+        
+        logger.info(f"Converted text to {features.shape[1]} features")
+        
+        # Apply DBSCAN clustering with provided parameters
+        db = DBSCAN(eps=eps, min_samples=min_samples)
+        labels = db.fit_predict(features)
+        
+        # Count labels
+        unique_labels = set(labels)
+        noise_count = list(labels).count(-1)
+        logger.info(f"DBSCAN clustering found {len(unique_labels)} clusters (including noise)")
+        logger.info(f"Noise points: {noise_count}/{len(labels)}")
+        
+        # Group indices by cluster label
+        clusters = {}
+        for i, label in enumerate(labels):
+            if label not in clusters:
+                clusters[label] = []
+            clusters[label].append(i)
+        
+        # If we only have noise, try a more aggressive approach for small datasets
+        if len(clusters) == 1 and -1 in clusters and len(text_responses) <= 10:
+            logger.warning("Only noise cluster found for small dataset. Trying K-means instead.")
+            # Try K-means as a fallback for small datasets
+            from sklearn.cluster import KMeans
+            
+            # Choose number of clusters - at most half the number of responses
+            n_clusters = min(3, max(2, len(text_responses) // 2))
+            kmeans = KMeans(n_clusters=n_clusters)
+            kmeans_labels = kmeans.fit_predict(features)
+            
+            # Create new clusters dictionary
+            new_clusters = {}
+            for i, label in enumerate(kmeans_labels):
+                if label not in new_clusters:
+                    new_clusters[label] = []
+                new_clusters[label].append(i)
+                
+            logger.info(f"K-means fallback created {len(new_clusters)} clusters")
+            return new_clusters
+        
+        return clusters
+        
+    except Exception as e:
+        logger.error(f"Error in clustering: {str(e)}", exc_info=True)
+        return {}
 
 
 def calculate_stats_from_scores(scores):
@@ -405,6 +455,7 @@ def assign_clusters_to_words(text, processed_words, language='en', survey=None):
             # Parse the response
             result = completion.choices[0].message.content
             word_to_cluster = {}
+            print(result)
             
             try:
                 result_json = json.loads(result)

@@ -115,15 +115,33 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
   useEffect(() => {
     async function loadTemplates() {
       try {
+        setIsLoadingTemplates(true);
         const templatesData = await getTemplates();
         setTemplates(templatesData);
+
+        // If initialData includes a template, select it
+        if (initialData?.template) {
+          const templateId = String(initialData.template);
+          setSelectedTemplateId(templateId);
+          const template = templatesData.find(t => t.id.toString() === templateId);
+          if (template) {
+            setSelectedTemplate(template);
+          }
+        }
       } catch (error) {
         console.error('Error loading templates:', error);
+        toast({
+          title: "Error loading templates",
+          description: "There was a problem loading the templates. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoadingTemplates(false);
       }
     }
     
     loadTemplates();
-  }, []);
+  }, [initialData?.template, toast]);
 
   // Helper function to format ISO datetime strings for datetime-local input
   const formatDateForInput = (dateString: string): string => {
@@ -417,8 +435,9 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
     try {
       setIsSubmitting(true);
       
-      // Normalize tokens data
-      data.tokens = data.tokens || [];
+      // Use the tokens from local state instead of from the form data
+      // This prevents duplicate token creation
+      data.tokens = tokens;
       
       // Format the data for submission
       const submissionData = {
@@ -429,8 +448,7 @@ export default function SurveyForm({ initialData, onSubmit, isLoading = false }:
         template: data.template === "" || data.template === undefined ? null : 
                  (typeof data.template === 'string' && !isNaN(Number(data.template)) ? 
                  Number(data.template) : data.template),
-        // Remove the token field entirely as we're no longer using it
-        // token: tokens.length > 0 ? tokens[0].token : generateToken(),
+        // Do not include the token field as we're using tokens array
         expiry_date: data.expiry_date || undefined,
         start_datetime: data.start_datetime || undefined,
         // Make sure to add the English title to headlines

@@ -1,8 +1,8 @@
-You are a data annotator tasked with categorizing pre-extracted words from survey answers into predefined clusters. The survey answers could be in English, German, Spanish or French. You will be provided with the survey answer, the pre-extracted words, and a list of predefined clusters.
+You are a data annotator tasked with categorizing pre-extracted words from survey answers into predefined clusters. The survey answers are in German, but the clusters are in English. You will be provided with the survey answer, the pre-extracted words along with their English translations, and a list of predefined clusters.
 
 Your Task
 
-For each pre-extracted word, assign it to one of the predefined clusters based on the context of the survey answer. Use the context of the survey answer to guide your categorization decisions.
+For each pre-extracted word, assign it to one of the predefined clusters based on the context of the survey answer. If a word does not fit any of the predefined clusters, create a new cluster that best describes its category by providing a cluster name. Use the context of the survey answer to guide your categorization decisions.
 
 Rules for Categorization
 
@@ -15,11 +15,11 @@ Evaluation words (such as adjectives like "super" or "gut") describe specific as
 For example, if "super" describes "thema" (topic), and "thema" is categorized under "Event," then "super" should also be categorized under "Event."
 Use Context to Guide Decisions
 Consider the overall meaning of the survey answer to understand the role of each word. For instance, in "Super Thema, gutes Timing zum Messebeginn" (Great topic, good timing for the trade fair start), "thema" refers to the event's topic, and "gut" evaluates the timing.
-You can not create a new cluster, only assign to existing clusters.
+Create New Clusters if Necessary (Only mention a name for the cluster)
 
 Response Format
 
-Provide your categorization in JSON format, where each key is a pre-extracted word and its value is the assigned cluster.
+Provide your categorization in JSON format, where each key is a pre-extracted word and its value is the assigned cluster (either predefined or newly created).
 
 Example
 
@@ -44,5 +44,3 @@ Additional Guidance
 Always consider the context of the entire survey answer when categorizing words.
 If multiple words relate to the same aspect (e.g., "super" and "thema" both relate to the topic), assign them to the same cluster.
 If a word could fit multiple clusters, choose the one that best matches its meaning in the given context.
-You can not comeup with a new cluster name. Your job is to assign one to one of the existing clusters for the most important words within a given sentence.
-You must assign a cluster to atleast one word from the given list of words, only from a given Cluster list.
